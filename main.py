@@ -171,8 +171,50 @@ def call_mutations(refname,
                    expanded_cigar,
                    gapped_read,
                    gapped_quality = None,):
-    for i in range(len(gapped_read)):
-        print(i,gapped_read[i], expanded_engapped_md[i], expanded_cigar[i])
+    mutations = []
+    i = 0
+    nonref_bases = 0
+    while i < len(gapped_read):
+        if expanded_cigar[i] == 'S':
+                #softmasked state
+                nonref_bases += 1
+                i += 1
+                continue
+        if expanded_cigar[i] == 'M' and expanded_engapped_md[i] == '.':
+                #match state with no variants
+                i += 1
+                continue
+        if expanded_cigar[i] == 'D':
+            deleted = ''
+            delstart = i+pos+1+nonref_bases
+            while expanded_cigar[i] == 'D':
+                deleted += expanded_engapped_md[i]
+                i += 1
+            mutations.append(f'{delstart}_{i+1+nonref_bases}del{deleted}')
+        if expanded_cigar[i] == 'I':
+            inserted = ''
+            insstart = i+pos+1+nonref_bases
+            while expanded_cigar[i] == 'I':
+                inserted += gapped_read[i]
+                i += 1
+                nonref_bases += 1
+            mutations.append(f'{insstart}_{insstart+1}ins{inserted}')
+        if expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.':
+            mutant = ''
+            reference = ''
+            substart = i + nonref_bases
+            while expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.':
+                mutant += gapped_read[i]
+                reference += expanded_engapped_md[i]
+                i += 1
+            if len(mutant) == 1:
+                mutations.append(f'{substart}{reference}>{mutant}')
+            else:
+                mutations.append(f'{substart}_{i+1+nonref_bases}delins{mutant}')
+        i += 1
+        print(mutations)
+        return mutations
+
 
 
 

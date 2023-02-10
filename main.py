@@ -31,7 +31,9 @@ def compact_cigar(expanded_cigar):
     result.append(str(count) + state)
     return "".join(result)
 
-def engap(seq, cigar):
+def engap(seq,
+          cigar,
+          is_reference = False):
     """Convert a match/delete/insert string and sequence into gapped sequence
     To convert the target sequence swap delete and insert symbols.
         Arguments:
@@ -40,12 +42,14 @@ def engap(seq, cigar):
         Returns:
             o   string : gapped seqeunce
     """
+    deletion_symbol = 'I' if is_reference else 'D'
     gapped = []
     xcigar = expand_cigar(cigar)
-    assert len(seq) == xcigar.count('M') + xcigar.count('I')
     seq = list(seq)
     for symbol in xcigar:
-        if symbol == 'D':
+        if symbol == deletion_symbol:
+            gapped.append('-')
+        elif is_reference and symbol == 'S':
             gapped.append('-')
         else:
             gapped.append(seq.pop(0))
@@ -161,6 +165,16 @@ def compact_expanded_mdtag_tokens(expanded_mdtag_tokens):
         result.append(str(count))
     return "".join(result).upper()
 
+def call_mutations(refname,
+                   pos,
+                   expanded_engapped_md,
+                   expanded_cigar,
+                   gapped_read,
+                   gapped_quality = None,):
+    for i in range(len(gapped_read)):
+        print(i,gapped_read[i], expanded_engapped_md[i], expanded_cigar[i])
+
+
 
 
 if __name__ == '__main__':
@@ -168,15 +182,21 @@ if __name__ == '__main__':
 
     samfile = pysam.AlignmentFile("tests/data/map.sam", "r")
     for segment in samfile:
-        #TODO skip if not correctly mapped
+        if segment.is_qcfail or segment.is_supplementary or segment.is_unmapped:
+            continue
         try:
             mdtag = segment.get_tag('MD')
         except:
+            print(f'skipping {segment.qname} as it has no MD tag')
             #skip reads with no MD tag
             continue
-        print(mdtag, expand_mdtag(mdtag))
-        print(segment.cigarstring, expand_cigar(segment.cigarstring))
+        print(segment.qname)
+        #print(mdtag, expand_mdtag(mdtag))
+        #print(segment.cigarstring, expand_cigar(segment.cigarstring))
+        #print(segment.reference_name, segment.pos)
 
-
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+        call_mutations(segment.reference_name,
+                       segment.pos,
+                       engap(expand_mdtag(mdtag), segment.cigarstring, is_reference = True),
+                       expand_cigar(segment.cigarstring),
+                       engap(segment.seq, segment.cigarstring))

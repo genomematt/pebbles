@@ -174,10 +174,11 @@ def call_mutations(refname,
     mutations = []
     i = 0
     nonref_bases = 0
+    softmasked = 0
     while i < len(gapped_read):
         if expanded_cigar[i] == 'S':
                 #softmasked state
-                nonref_bases += 1
+                softmasked += 1
                 i += 1
                 continue
         if expanded_cigar[i] == 'M' and expanded_engapped_md[i] == '.':
@@ -186,14 +187,14 @@ def call_mutations(refname,
                 continue
         if expanded_cigar[i] == 'D':
             deleted = ''
-            delstart = i+pos+1+nonref_bases
+            delstart = i+pos+1+nonref_bases-softmasked
             while expanded_cigar[i] == 'D':
                 deleted += expanded_engapped_md[i]
                 i += 1
-            mutations.append(f'{delstart}_{i+1+nonref_bases}del{deleted}')
+            mutations.append(f'{delstart}_{i+pos+nonref_bases-softmasked}del{deleted}')
         if expanded_cigar[i] == 'I':
             inserted = ''
-            insstart = i+pos+1+nonref_bases
+            insstart = i + pos + nonref_bases - softmasked  # base before first event base
             while expanded_cigar[i] == 'I':
                 inserted += gapped_read[i]
                 i += 1
@@ -202,7 +203,7 @@ def call_mutations(refname,
         if expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.':
             mutant = ''
             reference = ''
-            substart = i + nonref_bases
+            substart = i + pos + 1 + nonref_bases - softmasked
             while expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.':
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
@@ -210,7 +211,7 @@ def call_mutations(refname,
             if len(mutant) == 1:
                 mutations.append(f'{substart}{reference}>{mutant}')
             else:
-                mutations.append(f'{substart}_{i+1+nonref_bases}delins{mutant}')
+                mutations.append(f'{substart}_{i+pos+nonref_bases-softmasked}delins{mutant}')
         i += 1
         print(mutations)
         return mutations

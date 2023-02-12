@@ -2,7 +2,9 @@ import unittest
 import pathlib
 from pebbles import *
 
-TEST_FILE = pathlib.Path(__file__).parent.joinpath("data/map.sam")
+TEST_SAM = pathlib.Path(__file__).parent.joinpath("data/map.sam")
+TEST_BAM = pathlib.Path(__file__).parent.joinpath("data/map.bam")
+#TEST_CRAM = pathlib.Path(__file__).parent.joinpath("data/map.cram")
 
 
 class PebblesTestCase(unittest.TestCase):
@@ -78,7 +80,18 @@ class PebblesTestCase(unittest.TestCase):
                }), ['AY286018:g.59A>T'])
 
     def test_call_mutations_from_pysam(self):
-        result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_FILE, "r"))]
+        result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_SAM, "r"))]
+        self.assertEqual(result,
+                         [('WT', None),
+                          ('16_18delGAC', ['AY286018:g.16_18delGAC']),
+                          ('18_19insATG', ['AY286018:g.18_19insATG']),
+                          ('19_20delinsAG', ['AY286018:g.19_20delinsAG']),
+                          ('19_20delinsAG', ['AY286018:g.19_20delinsAG']),
+                          ('19_21delinsATG', ['AY286018:g.19_21delinsATG']),
+                          ('59A>T', ['AY286018:g.59A>T']),
+                          ('59A>T', ['AY286018:g.59A>T'])
+                          ])
+        result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_BAM, "rb"))]
         self.assertEqual(result,
                          [('WT', None),
                           ('16_18delGAC', ['AY286018:g.16_18delGAC']),

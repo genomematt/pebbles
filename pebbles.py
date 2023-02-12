@@ -5,29 +5,13 @@ import re
 import pysam
 
 
-def expand_cigar(cigar):
+def expand_cigar(cigar: str) -> str:
     return "".join([match[1] * int(match[0]) for match in re.findall(r'([0-9]+)([MIDNSHPX=])', cigar)])
 
 
-def compact_cigar(expanded_cigar):
-    state = None
-    result = []
-    last_state = expanded_cigar[0]
-    count = 0
-    for state in expanded_cigar:
-        if state == last_state:
-            count += 1
-        else:
-            result.append(str(count) + last_state)
-            last_state = state
-            count = 1
-    result.append(str(count) + state)
-    return "".join(result)
-
-
-def engap(seq,
-          cigar,
-          is_reference: bool = False):
+def engap(seq: str,
+          cigar: str,
+          is_reference: bool = False) -> str:
     """Convert a match/delete/insert string and sequence into gapped sequence
     To convert the target sequence swap delete and insert symbols.
         Arguments:
@@ -50,7 +34,7 @@ def engap(seq,
     return "".join(gapped)
 
 
-def expand_mdtag(mdtag):
+def expand_mdtag(mdtag: str) -> str:
     mdtag_tokens = re.findall(r'(\d+|\D+)', mdtag)
     result = []
     for token in mdtag_tokens:
@@ -63,41 +47,12 @@ def expand_mdtag(mdtag):
     return ''.join(result)
 
 
-def compact_expanded_mdtag_tokens(expanded_mdtag_tokens):
-    result = []
-    count = 0
-    in_deletion = False
-    for token in expanded_mdtag_tokens:
-        if token == '':
-            count += 1
-            in_deletion = False
-        elif count:
-            # exiting match
-            result.append(str(count))
-            count = 0
-            if token == '^':
-                in_deletion = True
-            result.append(token)
-        else:
-            # in mismatch or deletion states
-            if in_deletion and token == '^':
-                # adjacent deletions to be merged
-                continue
-            if in_deletion and (token in 'CAGTN'):
-                # have a mismatch adjacent to a deletion
-                result.append('0')
-                in_deletion = False
-            result.append(token)
-    if count:
-        result.append(str(count))
-    return "".join(result).upper()
 
-
-def call_mutations(refname,
-                   pos,
-                   expanded_engapped_md,
-                   expanded_cigar,
-                   gapped_read):
+def call_mutations(refname: str,
+                   pos: int,
+                   expanded_engapped_md: str,
+                   expanded_cigar: str,
+                   gapped_read: str) -> list:
     mutations = []
     i = 0
     nonref_bases = 0

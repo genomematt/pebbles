@@ -75,6 +75,8 @@ def call_mutations(refname: str,
                    expanded_cigar: str,
                    gapped_read: str) -> list:
     """Call mutations in single SAM/BAM reads to HGVS format
+    Assumes single end sequencing or merged paired end sequencing
+
     Arguments:
         refname: SAM reference sequence name
         pos: 1 based position in reference sequence
@@ -119,7 +121,7 @@ def call_mutations(refname: str,
             mutant = ''
             reference = ''
             substart = i + pos + 1 + nonref_bases - softmasked
-            while expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.':
+            while expanded_cigar[i] in 'MX' and expanded_engapped_md[i] != '.':
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
                 i += 1
@@ -131,7 +133,19 @@ def call_mutations(refname: str,
         return mutations
 
 
-def call_mutations_from_pysam(pysamfile,):
+def call_mutations_from_pysam(pysamfile):
+    """A generator function to call variants in all reads in a SAM/BAM
+    file to HGVS format, on a per read basis.
+    Assumes single end sequencing or merged paired end sequencing
+    Arguments:
+        pysamfile: a pysam.AlignmentFile object
+                   eg SAM pysam.AlignmentFile("data.sam", "r")
+                      BAM pysam.AlignmentFile("data.bam", "rb")
+
+    Yields:
+        a list of HGVS formatted variant events per read
+    """
+
     for segment in pysamfile:
         if segment.is_qcfail or segment.is_supplementary or segment.is_unmapped:
             continue

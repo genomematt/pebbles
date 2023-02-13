@@ -3,6 +3,7 @@
 
 import re
 import pysam
+import argparse
 
 
 def expand_cigar(cigar: str) -> str:
@@ -166,6 +167,53 @@ def call_mutations_from_pysam(pysamfile):
         yield (segment.qname, mutations)
 
 
+def cli():
+    parser = argparse.ArgumentParser(description="""
+    pebbles
+                  (                                                                
+             /((/ ###((%*                                                       
+            /%(((((@(((%&(                                                      
+             @(#(((((%                      @,     &#(#&&   *                   
+                #%(((    (,              (*       @/@(**#&**                    
+                  .*(#(#   /           @( (             %(///%(           @///% 
+               / &(((((((((((@.        & @       &    &      (         &////(//%
+               #((((#(((((((((((@      @(& %   @,@ /,,       /      &//@////(///
+              @((((((@...&%((((((&       (& . %,,,,,,#       #   #//#//&//%/#//*
+              (((((((&.....@@#(((#        ,&*,,,,,,,,,  @ ( .. &/////#///%/%/(  
+              @(((#((@.....*.%&(((       .,,,##,(@,,,,/#/& # .///#//#//(//((.   
+               ((..%(.........#.#/       /,,,,,,,,,,,,(* @ @///&////&//&/#      
+                (*........*@...@#           #//.@(*,%&% %//(/////////@.         
+                    *,....../*/.&        *,,,,,(,#*(@@&&%/#&*                   
+            **@#%%(****%..#,             (,,,(,(,(###/*,,,,@                    
+         @((/%******%/%***(                    #%(&##,,/*,,#                    
+         &((((@*/@**(...%@.&               #/&,   &&@  (**#*                    
+        %.%(((/((,**(...@...         ,%,,,,,(*/*%#(%  @@%/*.&                   
+      /*.%......#*%@*&..* ..        *,,(,,,*,/&%,,*,&@//**%                     
+         (*.&(**&     ,.,(., ,              (*,&,,,@   ./                       
+    A program for calling variants from SAM and BAM files.
+    Requires single end or merged reads.
+
+    Created by Matthew Wakefield.
+        Copyright (c) 2023  Matthew Wakefield. All rights reserved.
+
+           This program is distributed in the hope that it will be useful,
+           but WITHOUT ANY WARRANTY; without even the implied warranty of
+           MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+    """, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument('infile',
+                        type=str,
+                        help='a SAM or BAM format file of mapped single end reads'
+                        )
+
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    for x in call_mutations_from_pysam(pysam.AlignmentFile("tests/data/map.sam", "r")):
-        print(x)
+    args = cli()
+    if args.infile.split('.')[-1].lower() == 'sam':
+        for x in call_mutations_from_pysam(pysam.AlignmentFile(args.infile, "r")):
+            print(x)
+    else:
+        for x in call_mutations_from_pysam(pysam.AlignmentFile(args.infile, "rb")):
+            print(x)

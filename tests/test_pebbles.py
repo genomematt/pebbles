@@ -78,6 +78,12 @@ class PebblesTestCase(unittest.TestCase):
                'expanded_cigar': 'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM',
                'gapped_read': 'ACAGGCATGGGACCCTGCAGGGTTCTTGGCTTGGCGGCGGGACGAGAACGAGGTGACGACTCGGGCAAGCCTTTTTGTTTATACCAACAGCAACAACACAAAGGG'
                }), ['AY286018:g.59A>T'])
+        self.assertEqual(call_mutations(
+            **{'refname': 'AY286018', 'pos': 5,
+               'expanded_engapped_md': '.....................................................A.....',
+               'expanded_cigar':       '=====================================================X=====',
+               'gapped_read':          'ACAGGCATGGGACCCTGCAGGGTTCTTGGCTTGGCGGCGGGACGAGAACGAGGTGACGA'
+               }), ['AY286018:g.59A>T'])
 
     def test_call_mutations_from_pysam(self):
         result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_SAM, "r"))]

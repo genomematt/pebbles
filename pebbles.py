@@ -6,6 +6,16 @@ import pysam
 
 
 def expand_cigar(cigar: str) -> str:
+    """Convert a compact cigar string with state counts eg '2S10M1I5M1D1M'
+    to a fully expanded string of state operators eg 'SSMMMMMMMMMMIMMMMMDM'
+    Supports the operators MIDNSHPX=
+    see https://en.wikipedia.org/wiki/Sequence_alignment#Representations
+
+        Arguments:
+            o   cigar : a cigar string
+        Returns:
+            o   string : a fully expanded string of operators
+    """
     return "".join([match[1] * int(match[0]) for match in re.findall(r'([0-9]+)([MIDNSHPX=])', cigar)])
 
 
@@ -35,6 +45,17 @@ def engap(seq: str,
 
 
 def expand_mdtag(mdtag: str) -> str:
+    """Convert a SAM MD tag eg '6^TAG3G2' containing information on
+    the reference sequence content not included in the read to a string
+    of expanded match tokens '.' and reference states
+    eg '......TAG...G..'
+    see https://samtools.github.io/hts-specs/SAMv1.pdf
+
+        Arguments:
+            o   mdtag : a SAM MD tag string
+        Returns:
+            o   string : a fully expanded string match and reference states
+    """
     mdtag_tokens = re.findall(r'(\d+|\D+)', mdtag)
     result = []
     for token in mdtag_tokens:
@@ -53,6 +74,16 @@ def call_mutations(refname: str,
                    expanded_engapped_md: str,
                    expanded_cigar: str,
                    gapped_read: str) -> list:
+    """Call mutations in single SAM/BAM reads to HGVS format
+    Arguments:
+        refname: SAM reference sequence name
+        pos: 1 based position in reference sequence
+        expanded_engapped_md: expanded MD string with deletion states as gaps
+        expanded_cigar: expanded string of cigar operators
+        gapped_read: expanded read string with deletion states as gaps
+    Returns:
+        a list of HGVS formatted variant events
+    """
     mutations = []
     i = 0
     nonref_bases = 0
@@ -63,7 +94,8 @@ def call_mutations(refname: str,
             softmasked += 1
             i += 1
             continue
-        if expanded_cigar[i] == 'M' and expanded_engapped_md[i] == '.':
+        if expanded_cigar[i] == 'M' and expanded_engapped_md[i] == '.' or \
+                expanded_cigar[i] == '=':
             # match state with no variants
             i += 1
             continue
@@ -82,7 +114,8 @@ def call_mutations(refname: str,
                 i += 1
                 nonref_bases += 1
             mutations.append(f'{refname}:g.{insstart}_{insstart+1}ins{inserted}')
-        if expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.':
+        if (expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.') or \
+                expanded_cigar[i] == 'X':
             mutant = ''
             reference = ''
             substart = i + pos + 1 + nonref_bases - softmasked

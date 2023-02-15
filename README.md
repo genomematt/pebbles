@@ -17,7 +17,7 @@ Currently pebbles ignores quality scores and assumes all reads are a single unpa
 In most uses it will be desirable to align overlaps for paired end sequencing and trim reads before calling.
 
 
-#Installation
+# Installation
 To install from github using pip:
 
 ```shell
@@ -26,7 +26,7 @@ pip install git+https://github.org/genomematt/pebbles
 
 Pebbles requires pysam and has only been tested with versions >= 0.20.0 (htslib 1.6)
 
-#Usage
+# Usage
 For input pebbles requires a SAM or BAM file of alignment segments with MD tags. When using `minimap2` you
 will need to map with the `--MD` argument.
 

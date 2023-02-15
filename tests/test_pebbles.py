@@ -1,6 +1,6 @@
 import unittest
 import pathlib
-from pebbles import *
+from pebbles.pebbles import *
 
 TEST_SAM = pathlib.Path(__file__).parent.joinpath("data/map.sam")
 TEST_BAM = pathlib.Path(__file__).parent.joinpath("data/map.bam")

@@ -209,7 +209,7 @@ def cli():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+def main():
     args = cli()
     if args.infile.split('.')[-1].lower() == 'sam':
         for x in call_mutations_from_pysam(pysam.AlignmentFile(args.infile, "r")):
@@ -217,3 +217,7 @@ if __name__ == '__main__':
     else:
         for x in call_mutations_from_pysam(pysam.AlignmentFile(args.infile, "rb")):
             print(x)
+
+
+if __name__ == '__main__':
+    main()

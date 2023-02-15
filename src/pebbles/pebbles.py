@@ -4,6 +4,7 @@
 import re
 import pysam
 import argparse
+from collections import defaultdict
 
 
 def expand_cigar(cigar: str) -> str:
@@ -69,7 +70,6 @@ def expand_mdtag(mdtag: str) -> str:
     return ''.join(result)
 
 
-
 def call_mutations(refname: str,
                    pos: int,
                    expanded_engapped_md: str,
@@ -104,11 +104,11 @@ def call_mutations(refname: str,
             continue
         if expanded_cigar[i] == 'D':
             deleted = ''
-            delstart = i+pos+1+nonref_bases-softmasked
+            delstart = i + pos + 1 + nonref_bases - softmasked
             while expanded_cigar[i] == 'D':
                 deleted += expanded_engapped_md[i]
                 i += 1
-            mutations.append(f'{refname}:g.{delstart}_{i+pos+nonref_bases-softmasked}del{deleted}')
+            mutations.append(f'{refname}:g.{delstart}_{i + pos + nonref_bases - softmasked}del{deleted}')
         if expanded_cigar[i] == 'I':
             inserted = ''
             insstart = i + pos + nonref_bases - softmasked  # base before first event base
@@ -116,7 +116,7 @@ def call_mutations(refname: str,
                 inserted += gapped_read[i]
                 i += 1
                 nonref_bases += 1
-            mutations.append(f'{refname}:g.{insstart}_{insstart+1}ins{inserted}')
+            mutations.append(f'{refname}:g.{insstart}_{insstart + 1}ins{inserted}')
         if (expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.') or \
                 expanded_cigar[i] == 'X':
             mutant = ''
@@ -129,7 +129,7 @@ def call_mutations(refname: str,
             if len(mutant) == 1:
                 mutations.append(f'{refname}:g.{substart}{reference}>{mutant}')
             else:
-                mutations.append(f'{refname}:g.{substart}_{i+pos+nonref_bases-softmasked}delins{mutant}')
+                mutations.append(f'{refname}:g.{substart}_{i + pos + nonref_bases - softmasked}delins{mutant}')
         i += 1
         return mutations
 
@@ -164,7 +164,22 @@ def call_mutations_from_pysam(pysamfile):
                                          is_reference=True),
                                    expand_cigar(segment.cigarstring),
                                    engap(segment.seq, segment.cigarstring))
-        yield (segment.qname, mutations)
+        yield segment.qname, mutations
+
+
+def fix_multi_variants(variants):
+    if len(variants) > 1:
+        return variants[0].split(':g.')[0] + ':g.[' + ";".join([variant.split(':g.')[-1] for variant in variants]) + ']'
+    else:
+        return variants[0]
+
+
+def count(pysamfile, max=1):
+    counts = defaultdict(int)
+    for reaname,variants in call_mutations_from_pysam(pysamfile):
+        if variants and len(variants) <= max:
+            counts[fix_multi_variants(variants)] += 1
+    return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
 def cli():
@@ -201,6 +216,16 @@ def cli():
            MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
     """, formatter_class=argparse.RawTextHelpFormatter)
+    subparsers = parser.add_subparsers(dest='command')
+    count = subparsers.add_parser('count',
+                                  help='count occurrences of a variant')
+    call = subparsers.add_parser('call',
+                                  help='count occurrences of a variant')
+    count.add_argument('--max',
+                       type=int,
+                       default=1,
+                       help='Maximum number of variants in a read to include in count table'
+                       )
     parser.add_argument('infile',
                         type=str,
                         help='a SAM or BAM format file of mapped single end reads'
@@ -212,11 +237,17 @@ def cli():
 def main():
     args = cli()
     if args.infile.split('.')[-1].lower() == 'sam':
-        for x in call_mutations_from_pysam(pysam.AlignmentFile(args.infile, "r")):
-            print(x)
+        infile = pysam.AlignmentFile(args.infile, "r")
     else:
-        for x in call_mutations_from_pysam(pysam.AlignmentFile(args.infile, "rb")):
-            print(x)
+        infile = pysam.AlignmentFile(args.infile, "rb")
+
+    if args.command == 'call':
+        print('readname\tvariants')
+        for x in call_mutations_from_pysam(infile):
+            print("\t".join([str(_) for _ in x]))
+    elif args.command == 'count':
+        print('variant\tcount')
+        print(count(infile, max=args.max), end='')
 
 
 if __name__ == '__main__':

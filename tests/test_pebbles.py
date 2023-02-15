@@ -109,6 +109,20 @@ class PebblesTestCase(unittest.TestCase):
                           ('59A>T', ['AY286018:g.59A>T'])
                           ])
 
+    def test_fix_multi_variants(self):
+        self.assertEqual(fix_multi_variants(['AY286018:g.16_18delGAC', 'AY286018:g.59A>T']),
+                         'AY286018:g.[16_18delGAC;59A>T]'
+                        )
+
+    def test_count(self):
+        self.assertEqual(count(pysam.AlignmentFile(TEST_BAM, "rb")),
+                         ('AY286018:g.16_18delGAC\t1\n'
+                             'AY286018:g.18_19insATG\t1\n'
+                             'AY286018:g.19_20delinsAG\t2\n'
+                             'AY286018:g.19_21delinsATG\t1\n'
+                             'AY286018:g.59A>T\t2\n')
+                         )
+
 
 if __name__ == '__main__':
     unittest.main()

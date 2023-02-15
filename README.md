@@ -33,24 +33,44 @@ will need to map with the `--MD` argument.
 Pebbles is in early and active development. Features and usage is likely to change as it is integrated into
 other tools.
 
-To run pebbles simply use
+Pebbles can be used to call per read or to count occurrences of variants
+
+To call per read
 ```shell
-pebbles myalignedsequences.bam > output.txt
+pebbles call myalignedsequences.bam > output.tsv
 ```
 
-This will produce output of string representations of python tuples with the read name, and a list of variants
-identified in the read. For the test data of reads named with the expected variant in the tammar wallaby opsin
+This will produce a tab seperated file with the read name, and a list of variants
+identified in the read as a python list. For the test data of reads named with the expected variant in the tammar wallaby opsin
 gene this output looks like:
 
 ```text
-('WT', None)
-('16_18delGAC', ['AY286018:g.16_18delGAC'])
-('18_19insATG', ['AY286018:g.18_19insATG'])
-('19_20delinsAG', ['AY286018:g.19_20delinsAG'])
-('19_20delinsAG', ['AY286018:g.19_20delinsAG'])
-('19_21delinsATG', ['AY286018:g.19_21delinsATG'])
-('59A>T', ['AY286018:g.59A>T'])
-('59A>T', ['AY286018:g.59A>T'])
+readname        call
+WT      None
+16_18delGAC     ['AY286018:g.16_18delGAC']
+18_19insATG     ['AY286018:g.18_19insATG']
+19_20delinsAG   ['AY286018:g.19_20delinsAG']
+19_20delinsAG   ['AY286018:g.19_20delinsAG']
+19_21delinsATG  ['AY286018:g.19_21delinsATG']
+59A>T   ['AY286018:g.59A>T']
+59A>T   ['AY286018:g.59A>T']
+```
+
+To generate counts
+```shell
+pebbles count myalignedsequences.bam > output.tsv
+```
+
+This will produce a tab seperated file with a column of variants and a column of counts.
+For the test data this output looks like:
+
+```text
+variant      count
+AY286018:g.16_18delGAC  1
+AY286018:g.18_19insATG  1
+AY286018:g.19_20delinsAG    2
+AY286018:g.19_21delinsATG   1
+AY286018:g.59A>T    2
 ```
 
 # License

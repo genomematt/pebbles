@@ -35,7 +35,7 @@ class PebblesTestCase(unittest.TestCase):
                'expanded_engapped_md': '..............................................................................................................',
                'expanded_cigar': "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM",
                'gapped_read': 'ATGACACAGGCATGGGACCCTGCAGGGTTCTTGGCTTGGCGGCGGGACGAGAACGAGGAGACGACTCGGGCAAGCCTTTTTGTTTATACCAACAGCAACAACACAAAGGG'
-               }), None)
+               }), [])
         self.assertEqual(call_mutations(
             **{'refname': 'AY286018', 'pos': 0,
                'expanded_engapped_md': '...............GAC............................................................................................',
@@ -88,25 +88,27 @@ class PebblesTestCase(unittest.TestCase):
     def test_call_mutations_from_pysam(self):
         result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_SAM, "r"))]
         self.assertEqual(result,
-                         [('WT', None),
+                         [('WT', []),
                           ('16_18delGAC', ['AY286018:g.16_18delGAC']),
                           ('18_19insATG', ['AY286018:g.18_19insATG']),
                           ('19_20delinsAG', ['AY286018:g.19_20delinsAG']),
                           ('19_20delinsAG', ['AY286018:g.19_20delinsAG']),
                           ('19_21delinsATG', ['AY286018:g.19_21delinsATG']),
                           ('59A>T', ['AY286018:g.59A>T']),
-                          ('59A>T', ['AY286018:g.59A>T'])
+                          ('59A>T', ['AY286018:g.59A>T']),
+                          ('42G>T;59A>T', ['AY286018:g.42G>T', 'AY286018:g.59A>T']),
                           ])
         result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_BAM, "rb"))]
         self.assertEqual(result,
-                         [('WT', None),
+                         [('WT', []),
                           ('16_18delGAC', ['AY286018:g.16_18delGAC']),
                           ('18_19insATG', ['AY286018:g.18_19insATG']),
                           ('19_20delinsAG', ['AY286018:g.19_20delinsAG']),
                           ('19_20delinsAG', ['AY286018:g.19_20delinsAG']),
                           ('19_21delinsATG', ['AY286018:g.19_21delinsATG']),
                           ('59A>T', ['AY286018:g.59A>T']),
-                          ('59A>T', ['AY286018:g.59A>T'])
+                          ('59A>T', ['AY286018:g.59A>T']),
+                          ('42G>T;59A>T', ['AY286018:g.42G>T', 'AY286018:g.59A>T']),
                           ])
 
     def test_fix_multi_variants(self):

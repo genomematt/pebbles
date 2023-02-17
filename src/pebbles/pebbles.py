@@ -131,7 +131,7 @@ def call_mutations(refname: str,
             else:
                 mutations.append(f'{refname}:g.{substart}_{i + pos + nonref_bases - softmasked}delins{mutant}')
         i += 1
-        return mutations
+    return mutations
 
 
 def call_mutations_from_pysam(pysamfile):
@@ -176,7 +176,7 @@ def fix_multi_variants(variants):
 
 def count(pysamfile, max=1):
     counts = defaultdict(int)
-    for reaname,variants in call_mutations_from_pysam(pysamfile):
+    for readname,variants in call_mutations_from_pysam(pysamfile):
         if variants and len(variants) <= max:
             counts[fix_multi_variants(variants)] += 1
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])

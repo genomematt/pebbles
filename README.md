@@ -18,6 +18,12 @@ In most uses it will be desirable to align overlaps for paired end sequencing an
 
 
 # Installation
+To install from PyPI using pip:
+
+```shell
+pip install pebbles
+```
+
 To install from github using pip:
 
 ```shell

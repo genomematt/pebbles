@@ -27,10 +27,11 @@ pip install pebbles
 To install from github using pip:
 
 ```shell
-pip install git+https://github.org/genomematt/pebbles
+pip install git+https://github.com/genomematt/pebbles
 ```
 
 Pebbles requires pysam and has only been tested with versions >= 0.20.0 (htslib 1.6)
+Hatch is used as the build system, and will be required for source installs (and you need an up to date pip).
 
 # Usage
 For input pebbles requires a SAM or BAM file of alignment segments with MD tags. When using `minimap2` you

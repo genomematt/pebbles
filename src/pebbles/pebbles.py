@@ -4,8 +4,10 @@
 import re
 import pysam
 import argparse
+import sys
 from collections import defaultdict
 
+__version__ = "0.1.3"
 
 def expand_cigar(cigar: str) -> str:
     """Convert a compact cigar string with state counts eg '2S10M1I5M1D1M'
@@ -182,9 +184,8 @@ def count(pysamfile, max=1):
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
-def cli():
-    parser = argparse.ArgumentParser(description="""
-    pebbles
+def cli(arguments: str = None):
+    parser = argparse.ArgumentParser(description=f"pebbles v{__version__}" + """
                   (                                                                
              /((/ ###((%*                                                       
             /%(((((@(((%&(                                                      
@@ -226,10 +227,24 @@ def cli():
                        default=1,
                        help='Maximum number of variants in a read to include in count table'
                        )
-    parser.add_argument('infile',
+    count.add_argument('infile',
                         type=str,
-                        help='a SAM or BAM format file of mapped single end reads'
+                        help='a SAM or BAM format file of mapped single end reads',
                         )
+    call.add_argument('infile',
+                        type=str,
+                        help='a SAM or BAM format file of mapped single end reads',
+                        )
+    parser.add_argument('--version',
+                        action='store_true',
+                        help='print version information and exit')
+    if arguments:
+        args = parser.parse_args(arguments.split(' '))
+    else:
+        args = parser.parse_args()
+    if args.version:
+        print(f"pebbles v{__version__}")
+        sys.exit()
 
     return parser.parse_args()
 

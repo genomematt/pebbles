@@ -1,15 +1,16 @@
 # Pebbles. Sister of BammBamm Flinstone
 # A per read bam mutation caller
+import argparse
 import collections
 import re
-import pysam
-import argparse
 import sys
 from collections import defaultdict
-from typing import Tuple
 from collections.abc import Iterable, Mapping
+from typing import Tuple
+from pebbles import VERSION
 
-__version__ = "0.2.0"
+import pysam
+
 
 def expand_cigar(cigar: str) -> str:
     """Convert a compact cigar string with state counts eg '2S10M1I5M1D1M'
@@ -221,7 +222,7 @@ def count(pysamfile: Iterable,
 
 def cli(arguments: str = None) -> argparse.Namespace:
     """command line interface. Use pebbles -h to see help"""
-    parser = argparse.ArgumentParser(description=f"pebbles v{__version__}" + """
+    parser = argparse.ArgumentParser(description=f"pebbles v{VERSION}" + """
                   (                                                                
              /((/ ###((%*                                                       
             /%(((((@(((%&(                                                      
@@ -279,7 +280,7 @@ def cli(arguments: str = None) -> argparse.Namespace:
     else:
         args = parser.parse_args()
     if args.version:
-        print(f"pebbles v{__version__}")
+        print(f"pebbles v{VERSION}")
         sys.exit()
 
     return parser.parse_args()

@@ -1,14 +1,8 @@
-from collections.abc import Iterable, Mapping
-from itertools import islice
-from typing import Generator, Optional
-
-import dask.dataframe as dd
-import numpy as np
 import pandas as pd  # type: ignore
-from more_itertools import ichunked
 
+import pysam
 from pebbles import VERSION
-from pysam import AlignmentFile
+from pebbles.pebbles import count_dict
 
 from countess.core.parameters import (
     ArrayParam,
@@ -20,8 +14,6 @@ from countess.core.parameters import (
     StringParam,
 )
 from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dataframes, merge_dataframes
-
 
 
 class CountSAMPlugin(DaskInputPlugin):
@@ -46,10 +38,10 @@ class CountSAMPlugin(DaskInputPlugin):
         if column_suffix:
             count_column_name += "_" + column_suffix
 
-        with pysam.AlignmentFile(file_param["filename"].value, "_file_permissions") as fh:
-            records = pebbles.count_dict(fh, self.parameters["max"].value)
+        with pysam.AlignmentFile(file_param["filename"].value, _file_permissions) as fh:
+            records = count_dict(fh, self.parameters["max"].value)
 
-        return pd.DataFrame.from_records(
+        return pd.DataFrame.from_dict(
             records, columns=("allele", count_column_name)
         )
 

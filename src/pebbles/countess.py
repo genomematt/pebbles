@@ -41,7 +41,7 @@ class CountSAMPlugin(DaskInputPlugin):
             records = count_dict(fh, self.parameters["max"].value)
 
         return pd.DataFrame.from_records(
-            records.items(),  columns=("allele", count_column_name)
+            list(records.items()),  columns=("allele", count_column_name)
         )
 
     def combine_dfs(self, dfs):
@@ -78,6 +78,6 @@ class CountBAMPlugin(CountSAMPlugin):
             records = count_dict(fh, self.parameters["max"].value)
 
         return pd.DataFrame.from_records(
-            records.items(), columns=("allele", count_column_name)
+            list(records.items()), columns=("allele", count_column_name)
         )
 

@@ -41,7 +41,7 @@ class CountSAMPlugin(DaskInputPlugin):
             records = count_dict(fh, self.parameters["max"].value)
 
         return pd.DataFrame.from_dict(
-            records, columns=("allele", count_column_name)
+            records, orient='rows', columns=("allele", count_column_name)
         )
 
     def combine_dfs(self, dfs):
@@ -58,14 +58,14 @@ class CountBAMPlugin(CountSAMPlugin):
     """Counts occurences of alleles in a SAM file"""
 
     name = "BAM to Counts"
-    title = "Count from BAM"
+    title = "Count alleles in a SAM file (pebbles)"
     description = "Uses the Pebbles package to call variants from a BAM file to HGVS g. strings"
     version = VERSION
 
     file_types = [("BAM", "*.bam"),]
 
     parameters = {
-        "max": BooleanParam("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
     def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None):
@@ -78,6 +78,6 @@ class CountBAMPlugin(CountSAMPlugin):
             records = count_dict(fh, self.parameters["max"].value)
 
         return pd.DataFrame.from_dict(
-            records, columns=("allele", count_column_name)
+            records, orient='rows', columns=("allele", count_column_name)
         )
 

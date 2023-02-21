@@ -33,13 +33,13 @@ class CountSAMPlugin(DaskInputPlugin):
 
     _file_permissions = 'r'
 
-    def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None, _file_permissions='r'):
+    def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None):
         records = []
         count_column_name = "count"
         if column_suffix:
             count_column_name += "_" + str(column_suffix)
 
-        with pysam.AlignmentFile(file_param["filename"].value, _file_permissions=_file_permissions) as fh:
+        with pysam.AlignmentFile(file_param["filename"].value, _file_permissions) as fh:
             records = count_dict(fh, self.parameters["max"].value)
 
         return pd.DataFrame.from_dict(

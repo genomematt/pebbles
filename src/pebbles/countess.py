@@ -46,11 +46,11 @@ class CountSAMPlugin(DaskInputPlugin):
         )
 
     def combine_dfs(self, dfs):
-        """first concatenate the count dataframes, then (optionally) group them by sequence"""
+        """first concatenate the count dataframes, then group them by allele"""
 
         combined_df = concat_dask_dataframes(dfs)
 
-        if len(combined_df) and self.parameters["group"].value:
+        if len(combined_df):
             combined_df = combined_df.groupby(by=["allele"]).sum()
 
         return combined_df

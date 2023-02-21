@@ -12,6 +12,7 @@ from countess.core.parameters import (
     FloatParam,
     MultiParam,
     StringParam,
+    IntegerParam,
 )
 from countess.core.plugins import DaskInputPlugin
 
@@ -27,7 +28,7 @@ class CountSAMPlugin(DaskInputPlugin):
     file_types = [("SAM", "*.sam"),]
 
     parameters = {
-        "max": IntegerParameter("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
     _file_permissions = 'r'

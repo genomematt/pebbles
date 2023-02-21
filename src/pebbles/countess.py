@@ -15,10 +15,11 @@ from countess.core.parameters import (
     IntegerParam,
 )
 from countess.core.plugins import DaskInputPlugin
+from countess.utils.dask import concat_dataframes as concat_dask_dataframes
 
 
 class CountSAMPlugin(DaskInputPlugin):
-    """Counts occurences of alleles in a SAM file"""
+    """Counts occurrences of alleles in a SAM file"""
 
     name = "SAM to Counts"
     title = "Count alleles in a SAM file (pebbles)"
@@ -55,10 +56,10 @@ class CountSAMPlugin(DaskInputPlugin):
         return combined_df
 
 class CountBAMPlugin(CountSAMPlugin):
-    """Counts occurences of alleles in a SAM file"""
+    """Counts occurrences of alleles in a BAM file"""
 
     name = "BAM to Counts"
-    title = "Count alleles in a SAM file (pebbles)"
+    title = "Count alleles in a BAM file (pebbles)"
     description = "Uses the Pebbles package to call variants from a BAM file to HGVS g. strings"
     version = VERSION
 

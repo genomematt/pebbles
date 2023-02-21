@@ -32,7 +32,7 @@ class CountSAMPlugin(DaskInputPlugin):
     }
 
     def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None):
-        records = []
+        records = {}
         count_column_name = "count"
         if column_suffix:
             count_column_name += "_" + str(column_suffix)
@@ -40,8 +40,8 @@ class CountSAMPlugin(DaskInputPlugin):
         with pysam.AlignmentFile(file_param["filename"].value, 'r') as fh:
             records = count_dict(fh, self.parameters["max"].value)
 
-        return pd.DataFrame.from_dict(
-            records, orient='rows', columns=("allele", count_column_name)
+        return pd.DataFrame.from_records(
+            records.items(),  columns=("allele", count_column_name)
         )
 
     def combine_dfs(self, dfs):
@@ -69,7 +69,7 @@ class CountBAMPlugin(CountSAMPlugin):
     }
 
     def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None):
-        records = []
+        records = {}
         count_column_name = "count"
         if column_suffix:
             count_column_name += "_" + str(column_suffix)
@@ -77,7 +77,7 @@ class CountBAMPlugin(CountSAMPlugin):
         with pysam.AlignmentFile(file_param["filename"].value, 'rb') as fh:
             records = count_dict(fh, self.parameters["max"].value)
 
-        return pd.DataFrame.from_dict(
-            records, orient='rows', columns=("allele", count_column_name)
+        return pd.DataFrame.from_records(
+            records.items(), columns=("allele", count_column_name)
         )
 

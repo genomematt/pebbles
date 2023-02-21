@@ -31,7 +31,7 @@ class CountSAMPlugin(DaskInputPlugin):
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
-    def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None):
+    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
         records = {}
         count_column_name = "count"
         if column_suffix:
@@ -68,7 +68,7 @@ class CountBAMPlugin(CountSAMPlugin):
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
-    def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None):
+    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
         records = {}
         count_column_name = "count"
         if column_suffix:

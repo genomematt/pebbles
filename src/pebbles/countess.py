@@ -32,7 +32,7 @@ class CountSAMPlugin(DaskInputPlugin):
 
     _file_permissions = 'r'
 
-    def count_file_to_dataframe(self, file_param, column_suffix="", row_limit=None, _file_permissions='r'):
+    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None, _file_permissions='r'):
         records = []
         count_column_name = "count"
         if column_suffix:

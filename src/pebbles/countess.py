@@ -38,7 +38,7 @@ class CountSAMPlugin(DaskInputPlugin):
         if column_suffix:
             count_column_name += "_" + column_suffix
 
-        with pysam.AlignmentFile(file_param["filename"].value, _file_permissions) as fh:
+        with pysam.AlignmentFile(file_param["filename"].value, _file_permissions=_file_permissions) as fh:
             records = count_dict(fh, self.parameters["max"].value)
 
         return pd.DataFrame.from_dict(

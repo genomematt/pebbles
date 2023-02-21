@@ -22,7 +22,7 @@ dependencies = [
 [project.scripts]
 pebbles = "pebbles.pebbles:main"
 
-[project.entry_point.countess_plugins]
+[project.entry-points.countess_plugins]
 count_SAM = "pebbles.countess:CountSAMPlugin"
 count_BAM = "pebbles.countess:CountBAMPlugin"
 

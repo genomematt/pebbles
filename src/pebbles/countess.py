@@ -20,19 +20,19 @@ class CountSAMPlugin(DaskInputPlugin):
     """Counts occurences of alleles in a SAM file"""
 
     name = "SAM to Counts"
-    title = "Load from FastQ"
+    title = "Count alleles in a SAM file (pebbles)"
     description = "Uses the Pebbles package to call variants from a SAM file to HGVS g. strings"
     version = VERSION
 
     file_types = [("SAM", "*.sam"),]
 
     parameters = {
-        "max": BooleanParam("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "max": IntegerParameter("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
     _file_permissions = 'r'
 
-    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None, _file_permissions='r'):
+    def read_file_to_dataframe(self, file_param, logger, column_suffix="", row_limit=None, _file_permissions='r'):
         records = []
         count_column_name = "count"
         if column_suffix:

@@ -6,7 +6,7 @@ authors = [
 ]
 description = "A package for calling HGVS variants in single SAM/BAM alignments"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: BSD License",

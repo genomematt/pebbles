@@ -1,13 +1,16 @@
 # Pebbles. Sister of BammBamm Flinstone
 # A per read bam mutation caller
-
-import re
-import pysam
 import argparse
+import collections
+import re
 import sys
 from collections import defaultdict
+from collections.abc import Iterable, Mapping
+from typing import Tuple
+from pebbles import VERSION
 
-__version__ = "0.1.3"
+import pysam
+
 
 def expand_cigar(cigar: str) -> str:
     """Convert a compact cigar string with state counts eg '2S10M1I5M1D1M'
@@ -136,7 +139,7 @@ def call_mutations(refname: str,
     return mutations
 
 
-def call_mutations_from_pysam(pysamfile):
+def call_mutations_from_pysam(pysamfile: collections.abc.Iterable) -> Tuple[str, list]:
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
     Assumes single end sequencing or merged paired end sequencing
@@ -169,23 +172,57 @@ def call_mutations_from_pysam(pysamfile):
         yield segment.qname, mutations
 
 
-def fix_multi_variants(variants):
+def fix_multi_variants(variants: list) -> str:
+    """Convert a list of multiple HGVS genomic variants to a correctly specified allele
+    eg ['AY286018:g.16_18delGAC', 'AY286018:g.59A>T'] ->  'AY286018:g.[16_18delGAC;59A>T]'
+    Assumes all variants are allelic on the same reference
+    """
     if len(variants) > 1:
         return variants[0].split(':g.')[0] + ':g.[' + ";".join([variant.split(':g.')[-1] for variant in variants]) + ']'
     else:
         return variants[0]
 
 
-def count(pysamfile, max=1):
+def count_dict(pysamfile: Iterable,
+          max_variants: int =1,
+          ) -> Mapping[str, int]:
+    """
+    Counts occurrences of alleles in a SAM or BAM file
+
+    Arguments:
+        pysamfile - an iterable of alignment segment objects from pysam
+        max_variants - the maximum number of variants in a reported allele
+
+    Returns:
+        A dictionary keyed by allele HGVS strings of counts
+    """
     counts = defaultdict(int)
     for readname,variants in call_mutations_from_pysam(pysamfile):
-        if variants and len(variants) <= max:
+        if variants and len(variants) <= max_variants:
             counts[fix_multi_variants(variants)] += 1
+    return counts
+
+
+def count(pysamfile: Iterable,
+          max_variants: int =1,
+          ) -> str:
+    """
+    Counts occurrences of alleles in a SAM or BAM file
+
+    Arguments:
+        pysamfile - an iterable of alignment segment objects from pysam
+        max_variants - the maximum number of variants in a reported allele
+
+    Returns:
+        A tsv formatted text string of allele HGVS description and counts
+    """
+    counts = count_dict(pysamfile, max_variants)
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
-def cli(arguments: str = None):
-    parser = argparse.ArgumentParser(description=f"pebbles v{__version__}" + """
+def cli(arguments: str = None) -> argparse.Namespace:
+    """command line interface. Use pebbles -h to see help"""
+    parser = argparse.ArgumentParser(description=f"pebbles v{VERSION}" + """
                   (                                                                
              /((/ ###((%*                                                       
             /%(((((@(((%&(                                                      
@@ -243,7 +280,7 @@ def cli(arguments: str = None):
     else:
         args = parser.parse_args()
     if args.version:
-        print(f"pebbles v{__version__}")
+        print(f"pebbles v{VERSION}")
         sys.exit()
 
     return parser.parse_args()
@@ -262,7 +299,7 @@ def main():
             print("\t".join([str(_) for _ in x]))
     elif args.command == 'count':
         print('variant\tcount')
-        print(count(infile, max=args.max), end='')
+        print(count(infile, max_variants=args.max), end='')
 
 
 if __name__ == '__main__':

@@ -32,14 +32,16 @@ class CountSAMPlugin(DaskInputPlugin):
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
+    _file_permissions = 'r'
+
     def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
         records = {}
         count_column_name = "count"
         if column_suffix:
             count_column_name += "_" + str(column_suffix)
 
-        with pysam.AlignmentFile(file_param["filename"].value, 'r') as fh:
-            records = count_dict(fh, self.parameters["max"].value)
+        with pysam.AlignmentFile(file_param["filename"].value, self._file_permissions) as fh:
+            records = count_dict(fh, self.parameters["max"].value, row_limit)
 
         return pd.DataFrame.from_records(
             list(records.items()),  columns=("allele", count_column_name)
@@ -69,16 +71,5 @@ class CountBAMPlugin(CountSAMPlugin):
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
     }
 
-    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
-        records = {}
-        count_column_name = "count"
-        if column_suffix:
-            count_column_name += "_" + str(column_suffix)
-
-        with pysam.AlignmentFile(file_param["filename"].value, 'rb') as fh:
-            records = count_dict(fh, self.parameters["max"].value)
-
-        return pd.DataFrame.from_records(
-            list(records.items()), columns=("allele", count_column_name)
-        )
+    _file_permissions = 'rb'
 

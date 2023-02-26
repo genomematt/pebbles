@@ -43,9 +43,17 @@ class CountSAMPlugin(DaskInputPlugin):
         with pysam.AlignmentFile(file_param["filename"].value, self._file_permissions) as fh:
             records = count_dict(fh, self.parameters["max"].value, row_limit)
 
-        return pd.DataFrame.from_records(
-            list(records.items()),  columns=("allele", count_column_name)
-        )
+        if records:
+            return pd.DataFrame.from_records(
+                list(records.items()),  columns=("allele", count_column_name)
+            )
+        else:
+            # records may be an empty dictionary if no variants in row_limit
+            # return a useful shaped object to use in preview
+            return pd.DataFrame.from_records(
+                [(f'Warning:no_mutations_first_{row_limit}_alignments',0)],  columns=("allele", count_column_name)
+            )
+
 
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then group them by allele"""

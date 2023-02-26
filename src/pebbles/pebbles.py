@@ -5,6 +5,7 @@ import collections
 import re
 import sys
 from collections import defaultdict
+from itertools import islice
 from collections.abc import Iterable, Mapping
 from typing import Tuple
 from pebbles import VERSION
@@ -185,19 +186,21 @@ def fix_multi_variants(variants: list) -> str:
 
 def count_dict(pysamfile: Iterable,
           max_variants: int =1,
+          row_limit: int =None,
           ) -> Mapping[str, int]:
     """
     Counts occurrences of alleles in a SAM or BAM file
 
     Arguments:
         pysamfile - an iterable of alignment segment objects from pysam
-        max_variants - the maximum number of variants in a reported allele
+        max_variants - the maximum number of variants in a reported allele. Default 1
+        row_limit - the maximum number of alignments to process. Default None (ie process all)
 
     Returns:
         A dictionary keyed by allele HGVS strings of counts
     """
     counts = defaultdict(int)
-    for readname,variants in call_mutations_from_pysam(pysamfile):
+    for readname,variants in islice(call_mutations_from_pysam(pysamfile), row_limit):
         if variants and len(variants) <= max_variants:
             counts[fix_multi_variants(variants)] += 1
     return counts

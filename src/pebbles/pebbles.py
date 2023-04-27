@@ -7,7 +7,7 @@ import sys
 from collections import defaultdict
 from itertools import islice
 from collections.abc import Iterable, Mapping
-from typing import Tuple
+from typing import Tuple, Optional
 from pebbles import VERSION
 
 import pysam
@@ -41,14 +41,14 @@ def engap(seq: str,
     deletion_symbol = 'I' if is_reference else 'D'
     gapped = []
     xcigar = expand_cigar(cigar)
-    seq = list(seq)
+    seq_list = list(seq)
     for symbol in xcigar:
         if symbol == deletion_symbol:
             gapped.append('-')
         elif is_reference and symbol == 'S':
             gapped.append('-')
         else:
-            gapped.append(seq.pop(0))
+            gapped.append(seq_list.pop(0))
     return "".join(gapped)
 
 
@@ -142,7 +142,7 @@ def call_mutations(refname: str,
 
 def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
                               min_quality: int =0,
-                              ) -> Tuple[str, list]:
+                              ) -> Iterable[Tuple[str, list]]:
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
     Assumes single end sequencing or merged paired end sequencing
@@ -194,7 +194,7 @@ def fix_multi_variants(variants: list) -> str:
 
 def count_dict(pysamfile: Iterable,
                max_variants: int =1,
-               row_limit: int =None,
+               row_limit: Optional[int] =None,
                min_quality: int =0,
                ) -> Mapping[str, int]:
     """
@@ -210,7 +210,7 @@ def count_dict(pysamfile: Iterable,
     Returns:
         A dictionary keyed by allele HGVS strings of counts
     """
-    counts = defaultdict(int)
+    counts : dict[str,int] = defaultdict(int)
     for readname,variants in islice(call_mutations_from_pysam(pysamfile, min_quality), row_limit):
         if variants and len(variants) <= max_variants:
             counts[fix_multi_variants(variants)] += 1
@@ -236,7 +236,7 @@ def count(pysamfile: Iterable,
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
-def cli(arguments: str = None) -> argparse.Namespace:
+def cli(arguments: Optional[str] = None) -> argparse.Namespace:
     """command line interface. Use pebbles -h to see help"""
     parser = argparse.ArgumentParser(description=f"pebbles v{VERSION}" + """
                   (                                                                

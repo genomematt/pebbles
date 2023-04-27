@@ -140,14 +140,20 @@ def call_mutations(refname: str,
     return mutations
 
 
-def call_mutations_from_pysam(pysamfile: collections.abc.Iterable) -> Tuple[str, list]:
+def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
+                              min_quality: int =0,
+                              ) -> Tuple[str, list]:
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
     Assumes single end sequencing or merged paired end sequencing
+    qcfail, supplementary and unmapped segments are ignored
+
     Arguments:
         pysamfile: a pysam.AlignmentFile object
                    eg SAM pysam.AlignmentFile("data.sam", "r")
                       BAM pysam.AlignmentFile("data.bam", "rb")
+        min_quality - the minimum mapping quality score for a reported allele. Default 0.
+
 
     Yields:
         a list of HGVS formatted variant events per read
@@ -155,6 +161,8 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable) -> Tuple[str,
 
     for segment in pysamfile:
         if segment.is_qcfail or segment.is_supplementary or segment.is_unmapped:
+            continue
+        if segment.mapping_quality < min_quality:
             continue
         try:
             mdtag = segment.get_tag('MD')
@@ -185,9 +193,10 @@ def fix_multi_variants(variants: list) -> str:
 
 
 def count_dict(pysamfile: Iterable,
-          max_variants: int =1,
-          row_limit: int =None,
-          ) -> Mapping[str, int]:
+               max_variants: int =1,
+               row_limit: int =None,
+               min_quality: int =0,
+               ) -> Mapping[str, int]:
     """
     Counts occurrences of alleles in a SAM or BAM file
 
@@ -195,12 +204,14 @@ def count_dict(pysamfile: Iterable,
         pysamfile - an iterable of alignment segment objects from pysam
         max_variants - the maximum number of variants in a reported allele. Default 1
         row_limit - the maximum number of alignments to process. Default None (ie process all)
+        min_quality - the minimum mapping quality score for a reported allele. Default 0
+
 
     Returns:
         A dictionary keyed by allele HGVS strings of counts
     """
     counts = defaultdict(int)
-    for readname,variants in islice(call_mutations_from_pysam(pysamfile), row_limit):
+    for readname,variants in islice(call_mutations_from_pysam(pysamfile, min_quality), row_limit):
         if variants and len(variants) <= max_variants:
             counts[fix_multi_variants(variants)] += 1
     return counts
@@ -208,18 +219,20 @@ def count_dict(pysamfile: Iterable,
 
 def count(pysamfile: Iterable,
           max_variants: int =1,
+          min_quality: int =0,
           ) -> str:
     """
     Counts occurrences of alleles in a SAM or BAM file
 
     Arguments:
         pysamfile - an iterable of alignment segment objects from pysam
-        max_variants - the maximum number of variants in a reported allele
+        max_variants - the maximum number of variants in a reported allele. Default 1
+        min_quality - the minimum mapping quality score for a reported allele. Default 0
 
     Returns:
         A tsv formatted text string of allele HGVS description and counts
     """
-    counts = count_dict(pysamfile, max_variants)
+    counts = count_dict(pysamfile, max_variants=max_variants, min_quality=min_quality)
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
@@ -267,10 +280,20 @@ def cli(arguments: str = None) -> argparse.Namespace:
                        default=1,
                        help='Maximum number of variants in a read to include in count table'
                        )
+    count.add_argument('--min_quality',
+                       type=int,
+                       default=0,
+                       help='Minimum quality score required to count a variant'
+                       )
     count.add_argument('infile',
                         type=str,
                         help='a SAM or BAM format file of mapped single end reads',
                         )
+    call.add_argument('--min_quality',
+                       type=int,
+                       default=0,
+                       help='Minimum quality score required to call a variant'
+                       )
     call.add_argument('infile',
                         type=str,
                         help='a SAM or BAM format file of mapped single end reads',
@@ -298,11 +321,11 @@ def main():
 
     if args.command == 'call':
         print('readname\tvariants')
-        for x in call_mutations_from_pysam(infile):
+        for x in call_mutations_from_pysam(infile, min_quality=args.min_quality):
             print("\t".join([str(_) for _ in x]))
     elif args.command == 'count':
         print('variant\tcount')
-        print(count(infile, max_variants=args.max), end='')
+        print(count(infile, max_variants=args.max, min_quality=args.min_quality), end='')
 
 
 if __name__ == '__main__':

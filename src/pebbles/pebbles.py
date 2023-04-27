@@ -128,7 +128,7 @@ def call_mutations(refname: str,
             mutant = ''
             reference = ''
             substart = i + pos + 1 + nonref_bases - softmasked
-            while expanded_cigar[i] in 'MX' and expanded_engapped_md[i] != '.':
+            while len(expanded_cigar) > i and expanded_cigar[i] in 'MX' and len(expanded_engapped_md) > i and expanded_engapped_md[i] != '.':
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
                 i += 1

@@ -14,11 +14,10 @@ from countess.core.parameters import (
     StringParam,
     IntegerParam,
 )
-from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dataframes as concat_dask_dataframes
+from countess.core.plugins import PandasInputPlugin
 
 
-class CountSAMPlugin(DaskInputPlugin):
+class CountSAMPlugin(PandasInputPlugin):
     """Counts occurrences of alleles in a SAM file"""
 
     name = "SAM to Counts"
@@ -34,11 +33,9 @@ class CountSAMPlugin(DaskInputPlugin):
 
     _file_permissions = 'r'
 
-    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
+    def read_file_to_dataframe(self, file_param, logger, row_limit=None):
         records = {}
         count_column_name = "count"
-        if column_suffix:
-            count_column_name += "_" + str(column_suffix)
 
         with pysam.AlignmentFile(file_param["filename"].value, self._file_permissions) as fh:
             records = count_dict(fh, self.parameters["max"].value, row_limit)
@@ -58,7 +55,7 @@ class CountSAMPlugin(DaskInputPlugin):
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then group them by allele"""
 
-        combined_df = concat_dask_dataframes(dfs)
+        combined_df = pd.concat(dfs)
 
         if len(combined_df):
             combined_df = combined_df.groupby(by=["allele"]).sum()
@@ -80,4 +77,3 @@ class CountBAMPlugin(CountSAMPlugin):
     }
 
     _file_permissions = 'rb'
-

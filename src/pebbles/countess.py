@@ -75,5 +75,3 @@ class CountBAMPlugin(CountSAMPlugin):
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
         "min_quality": IntegerParam("Minimum quality score of alignment for a valid allele", 0),
     }
-
-

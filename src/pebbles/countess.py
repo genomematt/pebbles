@@ -26,29 +26,27 @@ class CountSAMPlugin(PandasInputPlugin):
     version = VERSION
 
     file_types = [("SAM", "*.sam"),]
+    file_mode = 'r'
 
     parameters = {
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "min_quality": IntegerParam("Minimum quality score of alignment for a valid allele", 0),
     }
 
-    _file_permissions = 'r'
 
     def read_file_to_dataframe(self, file_param, logger, row_limit=None):
         records = {}
         count_column_name = "count"
 
-        with pysam.AlignmentFile(file_param["filename"].value, self._file_permissions) as fh:
-            records = count_dict(fh, self.parameters["max"].value, row_limit)
+        with pysam.AlignmentFile(file_param["filename"].value, self.file_mode) as fh:
+            records = count_dict(fh,
+                                 max_variants=self.parameters["max"].value,
+                                 min_quality=self.parameters["min_quality"].value,
+                                 row_limit=row_limit,
+                                 logger=logger)
 
-        if records:
-            return pd.DataFrame.from_records(
-                list(records.items()),  columns=("allele", count_column_name)
-            )
-        else:
-            # records may be an empty dictionary if no variants in row_limit
-            # return a useful shaped object to use in preview
-            return pd.DataFrame.from_records(
-                [(f'Warning:no_mutations_first_{row_limit}_alignments',0)],  columns=("allele", count_column_name)
+        return pd.DataFrame.from_records(
+            list(records.items()),  columns=("allele", count_column_name)
             )
 
 
@@ -71,9 +69,9 @@ class CountBAMPlugin(CountSAMPlugin):
     version = VERSION
 
     file_types = [("BAM", "*.bam"),]
+    file_mode = 'rb'
 
     parameters = {
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "min_quality": IntegerParam("Minimum quality score of alignment for a valid allele", 0),
     }
-
-    _file_permissions = 'rb'

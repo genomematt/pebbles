@@ -142,6 +142,7 @@ def call_mutations(refname: str,
 
 def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
                               min_quality: int =0,
+                              logger = None,
                               ) -> Iterable[Tuple[str, list]]:
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
@@ -167,7 +168,10 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
         try:
             mdtag = segment.get_tag('MD')
         except KeyError:
-            print(f'skipping {segment.qname} as it has no MD tag')
+            if logger:
+                logger.warning(f'skipping {segment.qname} as it has no MD tag')
+            else:
+                print(f'skipping {segment.qname} as it has no MD tag')
             # skip reads with no MD tag
             continue
 
@@ -196,6 +200,7 @@ def count_dict(pysamfile: Iterable,
                max_variants: int =1,
                row_limit: Optional[int] =None,
                min_quality: int =0,
+               logger = None,
                ) -> Mapping[str, int]:
     """
     Counts occurrences of alleles in a SAM or BAM file
@@ -211,9 +216,19 @@ def count_dict(pysamfile: Iterable,
         A dictionary keyed by allele HGVS strings of counts
     """
     counts : dict[str,int] = defaultdict(int)
-    for readname,variants in islice(call_mutations_from_pysam(pysamfile, min_quality), row_limit):
+    number = 0
+    for readname,variants in islice(call_mutations_from_pysam(pysamfile, min_quality, logger), row_limit):
+        number += 1
+        if logger and number % 1000 == 0:
+            logger.progress(f"Loading {pysamfile.filename.decode()}")
         if variants and len(variants) <= max_variants:
             counts[fix_multi_variants(variants)] += 1
+
+    if logger:
+        logger.progress(f"Loaded {pysamfile.filename.decode()}",100)
+        if len(counts) == 0 and row_limit is not None:
+            logger.warning(f"No mutations found in first {row_limit} alignments")
+
     return counts
 
 

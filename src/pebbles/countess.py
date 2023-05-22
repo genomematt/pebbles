@@ -14,11 +14,10 @@ from countess.core.parameters import (
     StringParam,
     IntegerParam,
 )
-from countess.core.plugins import DaskInputPlugin
-from countess.utils.dask import concat_dataframes as concat_dask_dataframes
+from countess.core.plugins import PandasInputPlugin
 
 
-class CountSAMPlugin(DaskInputPlugin):
+class CountSAMPlugin(PandasInputPlugin):
     """Counts occurrences of alleles in a SAM file"""
 
     name = "SAM to Counts"
@@ -27,28 +26,34 @@ class CountSAMPlugin(DaskInputPlugin):
     version = VERSION
 
     file_types = [("SAM", "*.sam"),]
+    file_mode = 'r'
 
     parameters = {
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "min_quality": IntegerParam("Minimum quality score of alignment for a valid allele", 0),
     }
 
-    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
+
+    def read_file_to_dataframe(self, file_param, logger, row_limit=None):
         records = {}
         count_column_name = "count"
-        if column_suffix:
-            count_column_name += "_" + str(column_suffix)
 
-        with pysam.AlignmentFile(file_param["filename"].value, 'r') as fh:
-            records = count_dict(fh, self.parameters["max"].value)
+        with pysam.AlignmentFile(file_param["filename"].value, self.file_mode) as fh:
+            records = count_dict(fh,
+                                 max_variants=self.parameters["max"].value,
+                                 min_quality=self.parameters["min_quality"].value,
+                                 row_limit=row_limit,
+                                 logger=logger)
 
         return pd.DataFrame.from_records(
             list(records.items()),  columns=("allele", count_column_name)
-        )
+            )
+
 
     def combine_dfs(self, dfs):
         """first concatenate the count dataframes, then group them by allele"""
 
-        combined_df = concat_dask_dataframes(dfs)
+        combined_df = pd.concat(dfs)
 
         if len(combined_df):
             combined_df = combined_df.groupby(by=["allele"]).sum()
@@ -64,21 +69,9 @@ class CountBAMPlugin(CountSAMPlugin):
     version = VERSION
 
     file_types = [("BAM", "*.bam"),]
+    file_mode = 'rb'
 
     parameters = {
         "max": IntegerParam("Maximum number of variants in a valid allele (read/alignment)", 1),
+        "min_quality": IntegerParam("Minimum quality score of alignment for a valid allele", 0),
     }
-
-    def read_file_to_dataframe(self, file_param, column_suffix="", row_limit=None):
-        records = {}
-        count_column_name = "count"
-        if column_suffix:
-            count_column_name += "_" + str(column_suffix)
-
-        with pysam.AlignmentFile(file_param["filename"].value, 'rb') as fh:
-            records = count_dict(fh, self.parameters["max"].value)
-
-        return pd.DataFrame.from_records(
-            list(records.items()), columns=("allele", count_column_name)
-        )
-

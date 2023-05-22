@@ -4,7 +4,9 @@ from pebbles.pebbles import *
 
 TEST_SAM = pathlib.Path(__file__).parent.joinpath("data/map.sam")
 TEST_BAM = pathlib.Path(__file__).parent.joinpath("data/map.bam")
-#TEST_CRAM = pathlib.Path(__file__).parent.joinpath("data/map.cram")
+
+
+# TEST_CRAM = pathlib.Path(__file__).parent.joinpath("data/map.cram")
 
 
 class PebblesTestCase(unittest.TestCase):
@@ -81,8 +83,8 @@ class PebblesTestCase(unittest.TestCase):
         self.assertEqual(call_mutations(
             **{'refname': 'AY286018', 'pos': 5,
                'expanded_engapped_md': '.....................................................A.....',
-               'expanded_cigar':       '=====================================================X=====',
-               'gapped_read':          'ACAGGCATGGGACCCTGCAGGGTTCTTGGCTTGGCGGCGGGACGAGAACGAGGTGACGA'
+               'expanded_cigar': '=====================================================X=====',
+               'gapped_read': 'ACAGGCATGGGACCCTGCAGGGTTCTTGGCTTGGCGGCGGGACGAGAACGAGGTGACGA'
                }), ['AY286018:g.59A>T'])
 
     def test_call_mutations_from_pysam(self):
@@ -110,20 +112,57 @@ class PebblesTestCase(unittest.TestCase):
                           ('59A>T', ['AY286018:g.59A>T']),
                           ('42G>T;59A>T', ['AY286018:g.42G>T', 'AY286018:g.59A>T']),
                           ])
+        result = [call for call in call_mutations_from_pysam(pysam.AlignmentFile(TEST_BAM, "rb"), min_quality=61)]
+        self.assertEqual(result,[])
+
 
     def test_fix_multi_variants(self):
         self.assertEqual(fix_multi_variants(['AY286018:g.16_18delGAC', 'AY286018:g.59A>T']),
                          'AY286018:g.[16_18delGAC;59A>T]'
-                        )
+                         )
+
+    def test_count_dict(self):
+        self.assertEqual(count_dict(pysam.AlignmentFile(TEST_BAM, "rb")),
+                         {'AY286018:g.16_18delGAC': 1,
+                          'AY286018:g.18_19insATG': 1,
+                          'AY286018:g.19_20delinsAG': 2,
+                          'AY286018:g.19_21delinsATG': 1,
+                          'AY286018:g.59A>T': 2}
+                         )
+        self.assertEqual(count_dict(pysam.AlignmentFile(TEST_BAM, "rb"), row_limit=3),
+                         {'AY286018:g.16_18delGAC': 1,
+                          'AY286018:g.18_19insATG': 1}
+                         )
+        self.assertEqual(count_dict(pysam.AlignmentFile(TEST_BAM, "rb"), min_quality=61),
+                         {}
+                         )
 
     def test_count(self):
+        self.assertEqual(count(pysam.AlignmentFile(TEST_BAM, "rb"), min_quality=61),
+                        ''
+                         )
+        self.assertEqual(count(pysam.AlignmentFile(TEST_BAM, "rb"), min_quality=60),
+                         ('AY286018:g.16_18delGAC\t1\n'
+                          'AY286018:g.18_19insATG\t1\n'
+                          'AY286018:g.19_20delinsAG\t2\n'
+                          'AY286018:g.19_21delinsATG\t1\n'
+                          'AY286018:g.59A>T\t2\n')
+                         )
         self.assertEqual(count(pysam.AlignmentFile(TEST_BAM, "rb")),
                          ('AY286018:g.16_18delGAC\t1\n'
-                             'AY286018:g.18_19insATG\t1\n'
-                             'AY286018:g.19_20delinsAG\t2\n'
-                             'AY286018:g.19_21delinsATG\t1\n'
-                             'AY286018:g.59A>T\t2\n')
+                          'AY286018:g.18_19insATG\t1\n'
+                          'AY286018:g.19_20delinsAG\t2\n'
+                          'AY286018:g.19_21delinsATG\t1\n'
+                          'AY286018:g.59A>T\t2\n')
                          )
+        self.assertEqual(count(pysam.AlignmentFile(TEST_SAM, "r")),
+                         ('AY286018:g.16_18delGAC\t1\n'
+                          'AY286018:g.18_19insATG\t1\n'
+                          'AY286018:g.19_20delinsAG\t2\n'
+                          'AY286018:g.19_21delinsATG\t1\n'
+                          'AY286018:g.59A>T\t2\n')
+                         )
+
 
 
 if __name__ == '__main__':

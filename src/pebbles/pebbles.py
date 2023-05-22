@@ -4,12 +4,57 @@ import argparse
 import collections
 import re
 import sys
+import traceback
 from collections import defaultdict
+from itertools import islice
 from collections.abc import Iterable, Mapping
-from typing import Tuple
+from typing import Tuple, Optional
 from pebbles import VERSION
 
 import pysam
+
+
+class Logger:
+    """Basic Logger compatible with CountESS.core.logger"""
+
+    def __init__(self, stdout=sys.stdout, stderr=sys.stderr, prefix: Optional[str] = None):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.prefix = prefix
+
+    def progress(self, message: str = "Running", percentage: Optional[int] = None):
+        if self.prefix:
+            message = self.prefix + ": " + message
+        if percentage:
+            message += f" [{int(percentage):2d}%]"
+        self.stdout.write(f"{message}\n")
+
+    def log(self, level: str, message: str, detail: Optional[str] = None):
+        if self.prefix:
+            message = self.prefix + ": " + message
+        if detail:
+            message += " " + repr(detail)
+
+        self.stderr.write(message + "\n")
+
+    def info(self, message: str, detail: Optional[str] = None):
+        """Log a message at level info"""
+        self.log("info", message, detail)
+
+    def warning(self, message: str, detail: Optional[str] = None):
+        """Log a message at level warning"""
+        self.log("warning", message, detail)
+
+    def error(self, message: str, detail: Optional[str] = None):
+        """Log a message at level error"""
+        self.log("error", message, detail)
+
+    def exception(self, exception: Exception):
+        self.error(str(exception), detail="".join(traceback.format_exception(exception)))
+
+    def clear(self):
+        """Clear logs (if possible)"""
+        return None
 
 
 def expand_cigar(cigar: str) -> str:
@@ -40,14 +85,14 @@ def engap(seq: str,
     deletion_symbol = 'I' if is_reference else 'D'
     gapped = []
     xcigar = expand_cigar(cigar)
-    seq = list(seq)
+    seq_list = list(seq)
     for symbol in xcigar:
         if symbol == deletion_symbol:
             gapped.append('-')
         elif is_reference and symbol == 'S':
             gapped.append('-')
         else:
-            gapped.append(seq.pop(0))
+            gapped.append(seq_list.pop(0))
     return "".join(gapped)
 
 
@@ -127,7 +172,7 @@ def call_mutations(refname: str,
             mutant = ''
             reference = ''
             substart = i + pos + 1 + nonref_bases - softmasked
-            while expanded_cigar[i] in 'MX' and expanded_engapped_md[i] != '.':
+            while len(expanded_cigar) > i and expanded_cigar[i] in 'MX' and len(expanded_engapped_md) > i and expanded_engapped_md[i] != '.':
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
                 i += 1
@@ -139,14 +184,23 @@ def call_mutations(refname: str,
     return mutations
 
 
-def call_mutations_from_pysam(pysamfile: collections.abc.Iterable) -> Tuple[str, list]:
+def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
+                              min_quality: int =0,
+                              logger: Optional[Logger] = None,
+                              ) -> Iterable[Tuple[str, list]]:
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
     Assumes single end sequencing or merged paired end sequencing
+    qcfail, supplementary and unmapped segments are ignored
+
     Arguments:
         pysamfile: a pysam.AlignmentFile object
                    eg SAM pysam.AlignmentFile("data.sam", "r")
                       BAM pysam.AlignmentFile("data.bam", "rb")
+        min_quality:  the minimum mapping quality score for a reported allele. Default 0.
+        logger:    a logger object with a .warning() method such as CountESS.core.logger
+                   default: None
+
 
     Yields:
         a list of HGVS formatted variant events per read
@@ -155,10 +209,15 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable) -> Tuple[str,
     for segment in pysamfile:
         if segment.is_qcfail or segment.is_supplementary or segment.is_unmapped:
             continue
+        if segment.mapping_quality < min_quality:
+            continue
         try:
             mdtag = segment.get_tag('MD')
         except KeyError:
-            print(f'skipping {segment.qname} as it has no MD tag')
+            if logger:
+                logger.warning(f'skipping {segment.qname} as it has no MD tag')
+            else:
+                print(f'skipping {segment.qname} as it has no MD tag')
             # skip reads with no MD tag
             continue
 
@@ -184,43 +243,63 @@ def fix_multi_variants(variants: list) -> str:
 
 
 def count_dict(pysamfile: Iterable,
-          max_variants: int =1,
-          ) -> Mapping[str, int]:
+               max_variants: int = 1,
+               row_limit: Optional[int] = None,
+               min_quality: int = 0,
+               logger: Optional[Logger] = None,
+               ) -> Mapping[str, int]:
     """
     Counts occurrences of alleles in a SAM or BAM file
 
     Arguments:
-        pysamfile - an iterable of alignment segment objects from pysam
-        max_variants - the maximum number of variants in a reported allele
+        pysamfile    : an iterable of alignment segment objects from pysam
+        max_variants : the maximum number of variants in a reported allele. Default 1
+        row_limit    : the maximum number of alignments to process. Default None (ie process all)
+        min_quality  : the minimum mapping quality score for a reported allele. Default 0
+        logger       : a logger object with a .progress() & .warning() method such as CountESS.core.logger
+                       default: None
+
 
     Returns:
         A dictionary keyed by allele HGVS strings of counts
     """
-    counts = defaultdict(int)
-    for readname,variants in call_mutations_from_pysam(pysamfile):
+    counts : dict[str,int] = defaultdict(int)
+    number = 0
+    for readname, variants in islice(call_mutations_from_pysam(pysamfile, min_quality, logger), row_limit):
+        number += 1
+        if logger and number % 1000 == 0:
+            logger.progress(f"Loading {pysamfile.filename.decode()}")
         if variants and len(variants) <= max_variants:
             counts[fix_multi_variants(variants)] += 1
+
+    if logger:
+        logger.progress(f"Loaded {pysamfile.filename.decode()}",100)
+        if len(counts) == 0 and row_limit is not None:
+            logger.warning(f"No mutations found in first {row_limit} alignments")
+
     return counts
 
 
 def count(pysamfile: Iterable,
-          max_variants: int =1,
+          max_variants: int = 1,
+          min_quality: int = 0,
           ) -> str:
     """
     Counts occurrences of alleles in a SAM or BAM file
 
     Arguments:
         pysamfile - an iterable of alignment segment objects from pysam
-        max_variants - the maximum number of variants in a reported allele
+        max_variants - the maximum number of variants in a reported allele. Default 1
+        min_quality - the minimum mapping quality score for a reported allele. Default 0
 
     Returns:
         A tsv formatted text string of allele HGVS description and counts
     """
-    counts = count_dict(pysamfile, max_variants)
+    counts = count_dict(pysamfile, max_variants=max_variants, min_quality=min_quality)
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
-def cli(arguments: str = None) -> argparse.Namespace:
+def cli(arguments: Optional[str] = None) -> argparse.Namespace:
     """command line interface. Use pebbles -h to see help"""
     parser = argparse.ArgumentParser(description=f"pebbles v{VERSION}" + """
                   (                                                                
@@ -258,20 +337,30 @@ def cli(arguments: str = None) -> argparse.Namespace:
     count = subparsers.add_parser('count',
                                   help='count occurrences of a variant')
     call = subparsers.add_parser('call',
-                                  help='count occurrences of a variant')
+                                 help='count occurrences of a variant')
     count.add_argument('--max',
                        type=int,
                        default=1,
                        help='Maximum number of variants in a read to include in count table'
                        )
+    count.add_argument('--min_quality',
+                       type=int,
+                       default=0,
+                       help='Minimum quality score required to count a variant'
+                       )
     count.add_argument('infile',
-                        type=str,
-                        help='a SAM or BAM format file of mapped single end reads',
-                        )
+                       type=str,
+                       help='a SAM or BAM format file of mapped single end reads',
+                       )
+    call.add_argument('--min_quality',
+                      type=int,
+                      default=0,
+                      help='Minimum quality score required to call a variant'
+                      )
     call.add_argument('infile',
-                        type=str,
-                        help='a SAM or BAM format file of mapped single end reads',
-                        )
+                      type=str,
+                      help='a SAM or BAM format file of mapped single end reads',
+                      )
     parser.add_argument('--version',
                         action='store_true',
                         help='print version information and exit')
@@ -295,11 +384,11 @@ def main():
 
     if args.command == 'call':
         print('readname\tvariants')
-        for x in call_mutations_from_pysam(infile):
+        for x in call_mutations_from_pysam(infile, min_quality=args.min_quality):
             print("\t".join([str(_) for _ in x]))
     elif args.command == 'count':
         print('variant\tcount')
-        print(count(infile, max_variants=args.max), end='')
+        print(count(infile, max_variants=args.max, min_quality=args.min_quality), end='')
 
 
 if __name__ == '__main__':

@@ -4,13 +4,57 @@ import argparse
 import collections
 import re
 import sys
+import traceback
 from collections import defaultdict
 from itertools import islice
 from collections.abc import Iterable, Mapping
-from typing import Tuple
+from typing import Tuple, Optional
 from pebbles import VERSION
 
 import pysam
+
+
+class Logger:
+    """Basic Logger compatible with CountESS.core.logger"""
+
+    def __init__(self, stdout=sys.stdout, stderr=sys.stderr, prefix: Optional[str] = None):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.prefix = prefix
+
+    def progress(self, message: str = "Running", percentage: Optional[int] = None):
+        if self.prefix:
+            message = self.prefix + ": " + message
+        if percentage:
+            message += f" [{int(percentage):2d}%]"
+        self.stdout.write(f"{message}\n")
+
+    def log(self, level: str, message: str, detail: Optional[str] = None):
+        if self.prefix:
+            message = self.prefix + ": " + message
+        if detail:
+            message += " " + repr(detail)
+
+        self.stderr.write(message + "\n")
+
+    def info(self, message: str, detail: Optional[str] = None):
+        """Log a message at level info"""
+        self.log("info", message, detail)
+
+    def warning(self, message: str, detail: Optional[str] = None):
+        """Log a message at level warning"""
+        self.log("warning", message, detail)
+
+    def error(self, message: str, detail: Optional[str] = None):
+        """Log a message at level error"""
+        self.log("error", message, detail)
+
+    def exception(self, exception: Exception):
+        self.error(str(exception), detail="".join(traceback.format_exception(exception)))
+
+    def clear(self):
+        """Clear logs (if possible)"""
+        return None
 
 
 def expand_cigar(cigar: str) -> str:
@@ -141,8 +185,8 @@ def call_mutations(refname: str,
 
 
 def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
-                              min_quality: int =0,
-                              logger = None,
+                              min_quality: int = 0,
+                              logger: Optional[Logger] = None,
                               ) -> Tuple[str, list]:
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
@@ -153,7 +197,9 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
         pysamfile: a pysam.AlignmentFile object
                    eg SAM pysam.AlignmentFile("data.sam", "r")
                       BAM pysam.AlignmentFile("data.bam", "rb")
-        min_quality - the minimum mapping quality score for a reported allele. Default 0.
+        min_quality:  the minimum mapping quality score for a reported allele. Default 0.
+        logger:    a logger object with a .warning() method such as CountESS.core.logger
+                   default: None
 
 
     Yields:
@@ -197,19 +243,21 @@ def fix_multi_variants(variants: list) -> str:
 
 
 def count_dict(pysamfile: Iterable,
-               max_variants: int =1,
-               row_limit: int =None,
-               min_quality: int =0,
-               logger = None,
+               max_variants: int = 1,
+               row_limit: int = None,
+               min_quality: int = 0,
+               logger: Optional[Logger] = None,
                ) -> Mapping[str, int]:
     """
     Counts occurrences of alleles in a SAM or BAM file
 
     Arguments:
-        pysamfile - an iterable of alignment segment objects from pysam
-        max_variants - the maximum number of variants in a reported allele. Default 1
-        row_limit - the maximum number of alignments to process. Default None (ie process all)
-        min_quality - the minimum mapping quality score for a reported allele. Default 0
+        pysamfile    : an iterable of alignment segment objects from pysam
+        max_variants : the maximum number of variants in a reported allele. Default 1
+        row_limit    : the maximum number of alignments to process. Default None (ie process all)
+        min_quality  : the minimum mapping quality score for a reported allele. Default 0
+        logger       : a logger object with a .progress() & .warning() method such as CountESS.core.logger
+                       default: None
 
 
     Returns:
@@ -217,7 +265,7 @@ def count_dict(pysamfile: Iterable,
     """
     counts = defaultdict(int)
     number = 0
-    for readname,variants in islice(call_mutations_from_pysam(pysamfile, min_quality, logger), row_limit):
+    for readname, variants in islice(call_mutations_from_pysam(pysamfile, min_quality, logger), row_limit):
         number += 1
         if logger and number % 1000 == 0:
             logger.progress(f"Loading {pysamfile.filename.decode()}")
@@ -233,8 +281,8 @@ def count_dict(pysamfile: Iterable,
 
 
 def count(pysamfile: Iterable,
-          max_variants: int =1,
-          min_quality: int =0,
+          max_variants: int = 1,
+          min_quality: int = 0,
           ) -> str:
     """
     Counts occurrences of alleles in a SAM or BAM file
@@ -289,7 +337,7 @@ def cli(arguments: str = None) -> argparse.Namespace:
     count = subparsers.add_parser('count',
                                   help='count occurrences of a variant')
     call = subparsers.add_parser('call',
-                                  help='count occurrences of a variant')
+                                 help='count occurrences of a variant')
     count.add_argument('--max',
                        type=int,
                        default=1,
@@ -301,18 +349,18 @@ def cli(arguments: str = None) -> argparse.Namespace:
                        help='Minimum quality score required to count a variant'
                        )
     count.add_argument('infile',
-                        type=str,
-                        help='a SAM or BAM format file of mapped single end reads',
-                        )
-    call.add_argument('--min_quality',
-                       type=int,
-                       default=0,
-                       help='Minimum quality score required to call a variant'
+                       type=str,
+                       help='a SAM or BAM format file of mapped single end reads',
                        )
+    call.add_argument('--min_quality',
+                      type=int,
+                      default=0,
+                      help='Minimum quality score required to call a variant'
+                      )
     call.add_argument('infile',
-                        type=str,
-                        help='a SAM or BAM format file of mapped single end reads',
-                        )
+                      type=str,
+                      help='a SAM or BAM format file of mapped single end reads',
+                      )
     parser.add_argument('--version',
                         action='store_true',
                         help='print version information and exit')

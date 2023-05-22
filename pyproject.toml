@@ -19,6 +19,11 @@ dependencies = [
   "pysam >= 0.20.0",
 ]
 
+[project.optional-dependencies]
+countess = [
+    "countess >= 0.0.24, < 0.1"
+]
+
 [project.scripts]
 pebbles = "pebbles.pebbles:main"
 

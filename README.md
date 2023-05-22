@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/598950812.svg)](https://zenodo.org/badge/latestdoi/598950812)
+
 # pebbles
 
 Pebbles is a package for calling variants from single reads into HGVS format.
@@ -117,6 +119,7 @@ Pebbles aims to maintain a respectful and inclusive community and adopts the
 
 Pebbles is currently unpublished. 
 The current release can be cited using the Zenodo DOI. 
+[![DOI](https://zenodo.org/badge/598950812.svg)](https://zenodo.org/badge/latestdoi/598950812)
 
 # License
 Pebbles is released under the BSD 3 Clause License https://opensource.org/license/bsd-3-clause/

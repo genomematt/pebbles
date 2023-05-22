@@ -13,7 +13,7 @@ For most uses you will want to process the output of pebbles with a HGVS validat
 them into a different coordinate space such as the c. coordinates of the gene/transcript of interest.
 This can be done with packages such as https://hgvs.readthedocs.io or websites like mutalyzer.nl
 
-Currently pebbles ignores quality scores and assumes all reads are a single unpaired unique observation.
+Currently pebbles ignores per base quality scores and assumes all reads are a single unpaired unique observation.
 In most uses it will be desirable to align overlaps for paired end sequencing and trim reads before calling.
 
 
@@ -79,6 +79,44 @@ AY286018:g.19_20delinsAG    2
 AY286018:g.19_21delinsATG   1
 AY286018:g.59A>T    2
 ```
+
+For more detailed usage information see 
+```shell
+pebbles --help
+```
+
+# Usage as a CountESS plugin
+
+The CountESS project is a graphical workflow manager for analysing count based datasets, in particular Deep Mutational
+Scanning (DMS) and other Multiplex Assays of Variant Effects. CountESS is built with an entrypoint and inheritance
+based plugin system, that pebbles implements.
+
+To use pebbles in a CountESS workflow both Pebbles and CountESS need to be installed in the same python environment.
+Once correctly installed the BAM and SAM parsing workflow steps should automatically be detected by CountESS and made
+available in the user interface.
+
+For further information on CountESS see 
+[https://github.com/CountESS-Project/CountESS](https://github.com/CountESS-Project/CountESS)
+
+# Contributing to Pebbles
+Pebbles is licensed under the BSD-3-Clause license.  
+You are free to fork this repository under the terms of that license.
+If you have suggested changes please start by raising an issue in the issue tracker.
+Pull requests are welcome and will be included at the discretion of the author.
+Pull requests should be based on the 'develop' branch 
+(with the exception of bugfixes where develop has diverged from main).
+Bug reports should be made to the issue tracker.
+
+Difficulty in understanding how to use the software is a documentation bug, and should also be raised on the
+issue tracker so your question and my response are easily found by others.
+
+Pebbles aims to maintain a respectful and inclusive community and adopts the
+[contributor covenant v2.1](code_of_conduct.md)
+
+# Citing Pebbles
+
+Pebbles is currently unpublished. 
+The current release can be cited using the Zenodo DOI. 
 
 # License
 Pebbles is released under the BSD 3 Clause License https://opensource.org/license/bsd-3-clause/

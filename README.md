@@ -50,12 +50,13 @@ pebbles call myalignedsequences.bam > output.tsv
 ```
 
 This will produce a tab seperated file with the read name, and a list of variants
-identified in the read as a python list. For the test data of reads named with the expected variant in the tammar wallaby opsin
+identified in the read as a python list (`[]` for a read with no variants).
+For the test data of reads named with the expected variant in the tammar wallaby opsin
 gene this output looks like:
 
 ```text
-readname        call
-WT      None
+readname        variants
+WT      []
 16_18delGAC     ['AY286018:g.16_18delGAC']
 18_19insATG     ['AY286018:g.18_19insATG']
 19_20delinsAG   ['AY286018:g.19_20delinsAG']
@@ -63,6 +64,7 @@ WT      None
 19_21delinsATG  ['AY286018:g.19_21delinsATG']
 59A>T   ['AY286018:g.59A>T']
 59A>T   ['AY286018:g.59A>T']
+42G>T;59A>T     ['AY286018:g.42G>T', 'AY286018:g.59A>T']
 ```
 
 To generate counts
@@ -71,6 +73,9 @@ pebbles count myalignedsequences.bam > output.tsv
 ```
 
 This will produce a tab seperated file with a column of variants and a column of counts.
+Reads with no variants are not counted, and by default reads with more than one variant are
+excluded (use `--max` to count reads with more variants, which are reported as a combined allele
+eg `AY286018:g.[42G>T;59A>T]`).
 For the test data this output looks like:
 
 ```text
@@ -80,6 +85,11 @@ AY286018:g.18_19insATG  1
 AY286018:g.19_20delinsAG    2
 AY286018:g.19_21delinsATG   1
 AY286018:g.59A>T    2
+```
+
+The input format (SAM or BAM) is detected from the file contents, and `-` reads from stdin
+```shell
+samtools view -b -q 20 myalignedsequences.bam | pebbles count - > output.tsv
 ```
 
 For more detailed usage information see 

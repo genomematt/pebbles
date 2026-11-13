@@ -112,3 +112,15 @@ def test_closed_output_pipe_exits_quietly(tmp_path):
     process.wait(timeout=60)
     assert b'Traceback' not in stderr
     assert b'BrokenPipeError' not in stderr
+
+
+def test_skipped_read_warnings_kept_out_of_output(sam_factory, capsys):
+    sam = sam_factory([
+        ['noMD', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*'],
+        ['noSEQ', '0', 'R', '1', '60', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+        ['r1', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+    ])
+    main(['count', sam])
+    captured = capsys.readouterr()
+    assert captured.out == 'variant\tcount\nR:g.5A>T\t1\n'
+    assert 'noMD' in captured.err and 'noSEQ' in captured.err

@@ -361,7 +361,11 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
            MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
     """, formatter_class=argparse.RawTextHelpFormatter)
-    subparsers = parser.add_subparsers(dest='command')
+    parser.add_argument('--version',
+                        action='version',
+                        version=f"pebbles v{VERSION}",
+                        help='print version information and exit')
+    subparsers = parser.add_subparsers(dest='command', required=True, metavar='{count,call}')
     count = subparsers.add_parser('count',
                                   help='count occurrences of a variant')
     call = subparsers.add_parser('call',
@@ -389,17 +393,9 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
                       type=str,
                       help='a SAM or BAM format file of mapped single end reads',
                       )
-    parser.add_argument('--version',
-                        action='store_true',
-                        help='print version information and exit')
     if isinstance(arguments, str):
         arguments = shlex.split(arguments)
-    args = parser.parse_args(arguments)
-    if args.version:
-        print(f"pebbles v{VERSION}")
-        sys.exit()
-
-    return args
+    return parser.parse_args(arguments)
 
 
 def main(arguments: Optional[Union[str, Sequence[str]]] = None):

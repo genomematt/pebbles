@@ -33,3 +33,18 @@ def test_cli_uses_supplied_arguments(arguments):
 def test_main_count(capsys):
     main(['count', TEST_BAM])
     assert capsys.readouterr().out == EXPECTED_COUNT
+
+
+def test_missing_subcommand_is_a_usage_error(capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        cli([])
+    assert exit_info.value.code == 2
+    assert 'required' in capsys.readouterr().err
+
+
+def test_version(capsys):
+    from pebbles import VERSION
+    with pytest.raises(SystemExit) as exit_info:
+        cli(['--version'])
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out == f'pebbles v{VERSION}\n'

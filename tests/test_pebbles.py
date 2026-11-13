@@ -294,3 +294,52 @@ def test_refseq_header_translates_name_styles(gi_tool, mock_bam_factory, tmp_pat
     gi_tool.create_refseq_header(bam, out_sam)
     with pysam.AlignmentFile(out_sam, "r") as sam:
         assert [sq['SN'] for sq in sam.header['SQ']] == expected
+
+
+# Real headers for genomes that are not in the registry. Each includes the
+# scaffolds whose lengths coincide with sequences in registered assemblies,
+# which previously caused them to be identified as human or mouse.
+ZEBRAFISH_GRCZ11 = [
+    ('1', 59578282), ('2', 59640629), ('3', 62628489), ('4', 78093715), ('5', 72500376), ('6', 60270059),
+    ('7', 74282399), ('8', 54304671), ('9', 56459846), ('10', 45420867), ('11', 45484837), ('12', 49182954),
+    ('13', 52186027), ('14', 52660232), ('15', 48040578), ('16', 55266484), ('17', 53461100), ('18', 51023478),
+    ('19', 48449771), ('20', 55201332), ('21', 45934066), ('22', 39133080), ('23', 46223584), ('24', 42172926),
+    ('25', 37502051), ('MT', 16596),
+    ('KN149777.1', 1553), ('KN149846.1', 28664), ('KN149909.1', 40056), ('KN150119.1', 1143),
+    ('KZ116038.1', 1428), ('KZ115432.1', 272653),
+]
+CHICKEN_GRCG7B = [
+    ('1', 196449156), ('2', 149539284), ('3', 110642502), ('4', 90861225), ('5', 59506338), ('6', 36220557),
+    ('7', 36382834), ('8', 29578256), ('9', 23733309), ('10', 20453248), ('11', 19638187), ('12', 20119077),
+    ('13', 17905061), ('14', 15331188), ('15', 12703657), ('16', 2706039), ('17', 11092391), ('18', 11623896),
+    ('19', 10455293), ('20', 14265659), ('21', 6970754), ('22', 4686657), ('23', 6253421), ('24', 6478339),
+    ('25', 3067737), ('26', 5349051), ('27', 5228753), ('28', 5437364), ('29', 726478), ('30', 755666),
+    ('31', 2457334), ('32', 125424), ('33', 3839931), ('34', 3469343), ('35', 554126), ('36', 358375),
+    ('37', 157853), ('38', 667312), ('39', 177356), ('W', 9109940), ('Z', 86044486), ('MT', 16784),
+    ('JAENSK010000673.1', 2415),
+]
+
+
+@pytest.mark.parametrize("sequences", [ZEBRAFISH_GRCZ11, CHICKEN_GRCG7B], ids=["zebrafish_GRCz11", "chicken_GRCg7b"])
+def test_unregistered_genome_with_coincidental_scaffold_lengths_is_not_identified(gi_tool, mock_bam_factory, sequences):
+    bam = mock_bam_factory("unregistered.bam", sequences)
+    with pytest.raises(ValueError, match="No match"):
+        gi_tool.identify_assembly(bam)
+
+
+def test_human_header_with_many_unlisted_decoys_is_identified(gi_tool, mock_bam_factory):
+    """hs38DH-style headers add thousands of decoy and HLA sequences that are not in the assembly report."""
+    report = gi_tool.fetch_assembly_report("GCF_000001405.40", "GRCh38.p14")
+    chromosomes = [(f"chr{r['name']}", int(r['length'])) for _, r in report.iterrows() if r['role'] == 'assembled-molecule']
+    reported_lengths = set(report['length'].astype(int))
+    decoy_lengths = [length for length in range(1001, 20000, 7) if length not in reported_lengths][:2900]
+    decoys = [(f"chrUn_JTFH0100{i:05d}v1_decoy", length) for i, length in enumerate(decoy_lengths)]
+    bam = mock_bam_factory("hs38DH_like.bam", chromosomes + decoys + [("chrEBV", 171823)])
+    assert gi_tool.identify_assembly(bam) == ("GCF_000001405.40", "GRCh38.p14")
+
+
+def test_header_without_any_chromosome_is_not_identified(gi_tool, mock_bam_factory):
+    # an unlocalized GRCh38 scaffold on its own is not enough evidence for an assembly
+    bam = mock_bam_factory("scaffold_only.bam", [("chr1_KI270706v1_random", 175055)])
+    with pytest.raises(ValueError, match="No match"):
+        gi_tool.identify_assembly(bam)

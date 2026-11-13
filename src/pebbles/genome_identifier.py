@@ -142,35 +142,67 @@ class GenomeIdentifier:
             print(f"Error parsing {path}: {e}")
             return pd.DataFrame()
 
+    # Fraction of the header's total bases that must be in sequences whose lengths
+    # are in the assembly report for that assembly to be accepted as a match
+    MIN_MATCHED_BASE_FRACTION = 0.5
+
     def identify_assembly(self, bam_path: str) -> Tuple[str, str]:
+        """Identify the registered assembly that a SAM/BAM header was aligned to.
+
+        Header sequences are matched to assembly report sequences by length.
+        A whole-genome header for an unregistered genome usually contains a few
+        scaffolds whose lengths coincide with sequences in a registered assembly,
+        so an assembly is only accepted when the matched sequences make up at
+        least MIN_MATCHED_BASE_FRACTION of the header's bases and include at
+        least one of the assembly's chromosomes (assembled molecules).
+
+        The assembly with the most matched bases (then most matched sequences)
+        is returned. Ties within one accession series (eg GRCh38 patch levels)
+        go to the newest version; other ties keep the earlier registry entry.
+
+        Raises:
+            ValueError: if no registered assembly meets these criteria
+        """
         with pysam.AlignmentFile(bam_path, "rb") as sam:
-            bam_lengths = {int(length) for length in sam.lengths}
+            bam_lengths = [int(length) for length in sam.lengths]
+        total_bases = sum(bam_lengths)
 
-        best_acc, best_aid, max_match = None, None, 0
-
-        # Sort registry to check newest (highest version) first or use it as tie-breaker
+        best: Optional[Tuple[Tuple[int, int], str, str]] = None
         for acc, aid in self.registry:
             try:
                 df = self.fetch_assembly_report(acc, aid)
-                if df.empty: continue
-
-                report_lengths = set(pd.to_numeric(df['length'], errors='coerce').dropna().astype(int))
-                match_count = len(bam_lengths.intersection(report_lengths))
-
-                # TIE-BREAKER LOGIC:
-                # Update if we find a BETTER match, OR if it's an EQUAL match
-                # but a newer version (higher accession number)
-                if match_count > 0:
-                    if (match_count > max_match) or (match_count == max_match and best_acc and acc > best_acc):
-                        max_match = match_count
-                        best_acc, best_aid = acc, aid
             except Exception:
                 continue
+            if df.empty:
+                continue
 
-        if not best_acc:
-            raise ValueError(f"No match for lengths: {bam_lengths}")
+            report_lengths = set(df['length'].astype(int))
+            chromosome_lengths = set(df.loc[df['role'] == 'assembled-molecule', 'length'].astype(int))
+            matched = [length for length in bam_lengths if length in report_lengths]
+            matched_bases = sum(matched)
 
-        return best_acc, best_aid
+            if not any(length in chromosome_lengths for length in matched):
+                continue
+            if matched_bases < self.MIN_MATCHED_BASE_FRACTION * total_bases:
+                continue
+
+            score = (matched_bases, len(matched))
+            if best is None or score > best[0] or (score == best[0] and self._is_newer_version(acc, best[1])):
+                best = (score, acc, aid)
+
+        if best is None:
+            raise ValueError(f"No match for {bam_path}: no registered assembly accounts for "
+                             f"at least {self.MIN_MATCHED_BASE_FRACTION:.0%} of the bases in its "
+                             f"{len(bam_lengths)} header sequences")
+
+        return best[1], best[2]
+
+    @staticmethod
+    def _is_newer_version(acc: str, other: str) -> bool:
+        """True if acc is a later version of the same accession as other (eg GCF_000001405.40 vs .26)"""
+        base, _, version = acc.partition('.')
+        other_base, _, other_version = other.partition('.')
+        return base == other_base and int(version) > int(other_version)
 
     def get_id_translation_table(self, bam_path: str) -> Dict[str, str]:
         """Creates an alias-to-RefSeq translation dictionary.

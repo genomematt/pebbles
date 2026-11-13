@@ -248,3 +248,27 @@ def test_skip_warnings_use_logger(sam_factory):
 def test_unknown_accession_download_is_a_clear_error(gi_tool):
     with pytest.raises(ValueError, match="No NCBI download location"):
         gi_tool.refresh_cache("GCF_999999999.1", "NotAnAssembly")
+
+
+def test_every_registry_assembly_is_bundled(gi_tool):
+    """Every registry entry ships with the package so identification never needs the network."""
+    import importlib.resources
+    bundled = importlib.resources.files("pebbles.data.assemblies")
+    missing = [acc for acc, aid in gi_tool.registry if not (bundled / f"{acc}.report.txt").is_file()]
+    assert missing == []
+
+
+def test_identification_works_offline(tmp_path, mock_bam_factory, monkeypatch):
+    """With an empty cache and no network, bundled reports are enough to identify and reject headers."""
+    import requests
+
+    def no_network(*args, **kwargs):
+        raise AssertionError(f"unexpected download: {args[0] if args else kwargs}")
+
+    monkeypatch.setattr(requests, "get", no_network)
+    gi = GenomeIdentifier(cache_dir=str(tmp_path / "empty_cache"))
+    assert gi.identify_assembly(mock_bam_factory("hg38.bam", [("chr1", 248956422)]))[0] == "GCF_000001405.40"
+    # an amplicon reference matches nothing, which must not trigger downloads either
+    with pytest.raises(ValueError, match="No match"):
+        gi.identify_assembly(mock_bam_factory("amplicon.bam", [("AY286018", 1433)]))
+    assert list((tmp_path / "empty_cache").iterdir()) == []

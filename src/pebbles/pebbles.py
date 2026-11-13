@@ -200,7 +200,8 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
     Assumes single end sequencing or merged paired end sequencing
-    qcfail, supplementary and unmapped segments are ignored
+    qcfail, secondary, supplementary and unmapped segments are ignored,
+    as are segments with no stored sequence (SEQ of *)
 
     Arguments:
         pysamfile: a pysam.AlignmentFile object
@@ -216,9 +217,15 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
     """
 
     for segment in pysamfile:
-        if segment.is_qcfail or segment.is_supplementary or segment.is_unmapped:
+        if segment.is_qcfail or segment.is_secondary or segment.is_supplementary or segment.is_unmapped:
             continue
         if segment.mapping_quality < min_quality:
+            continue
+        if segment.query_sequence is None:
+            if logger:
+                logger.warning(f'skipping {segment.qname} as it has no sequence')
+            else:
+                print(f'skipping {segment.qname} as it has no sequence')
             continue
         try:
             mdtag = segment.get_tag('MD')

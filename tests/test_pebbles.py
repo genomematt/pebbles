@@ -35,6 +35,19 @@ def mock_bam_factory(tmp_path):
     return _create_bam
 
 
+@pytest.fixture
+def sam_factory(tmp_path):
+    """Writes SAM records against a 10bp reference R (ACGTACGTAC) to a file and returns its path."""
+
+    def _create_sam(records: list, filename: str = "records.sam"):
+        path = tmp_path / filename
+        lines = ["@SQ\tSN:R\tLN:10"] + ["\t".join(fields) for fields in records]
+        path.write_text("\n".join(lines) + "\n")
+        return str(path)
+
+    return _create_sam
+
+
 # --- CORE PEBBLES TESTS ---
 
 @pytest.mark.parametrize("cigar, expected", [
@@ -189,3 +202,23 @@ def test_call_mutations_after_insertion(cigar, mdtag, seq, expected):
 ])
 def test_call_mutations_trailing_events(cigar, mdtag, seq, expected):
     assert _call(cigar, mdtag, seq) == expected
+
+
+def test_secondary_alignments_ignored(sam_factory):
+    sam = sam_factory([
+        ['r1', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+        # secondary with a stored sequence must not be counted a second time
+        ['r1', '256', 'R', '1', '0', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+        # secondary with SEQ of * (the usual case) must not crash
+        ['r1', '256', 'R', '1', '0', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+    ])
+    assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == [('r1', ['R:g.5A>T'])]
+    assert count_dict(pysam.AlignmentFile(sam, "r")) == {'R:g.5A>T': 1}
+
+
+def test_primary_without_sequence_skipped(sam_factory):
+    sam = sam_factory([
+        ['r1', '0', 'R', '1', '60', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+        ['r2', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+    ])
+    assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == [('r2', ['R:g.5A>T'])]

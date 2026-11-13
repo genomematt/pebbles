@@ -173,17 +173,30 @@ class GenomeIdentifier:
         return best_acc, best_aid
 
     def get_id_translation_table(self, bam_path: str) -> Dict[str, str]:
-        """Creates an alias-to-RefSeq translation dictionary."""
+        """Creates an alias-to-RefSeq translation dictionary.
+
+        Aliases are the sequence name (Ensembl style, eg '1'), GenBank accession
+        and UCSC style name (eg 'chr1'). The assigned molecule column is only an
+        alias for assembled molecules: scaffolds and patches also record the
+        chromosome they belong to there, so using it for them would map '1' to
+        a chromosome 1 scaffold. Assembled molecules are added first and are
+        never overwritten.
+        """
         acc, aid = self.identify_assembly(bam_path)
         df = self.fetch_assembly_report(acc, aid)
 
-        translation_table = {}
-        for _, row in df.iterrows():
+        is_assembled = df['role'] == 'assembled-molecule'
+        translation_table: Dict[str, str] = {}
+        for _, row in pd.concat([df[is_assembled], df[~is_assembled]]).iterrows():
             refseq_id = str(row['refseq'])
-            if refseq_id == 'na': continue
-            for alias in [row['molecule'], row['genbank'], row['ucsc'], row['name']]:
+            if refseq_id == 'na':
+                continue
+            aliases = [row['name'], row['genbank'], row['ucsc']]
+            if row['role'] == 'assembled-molecule':
+                aliases.append(row['molecule'])
+            for alias in aliases:
                 if pd.notna(alias) and str(alias).lower() != 'na':
-                    translation_table[str(alias)] = refseq_id
+                    translation_table.setdefault(str(alias), refseq_id)
         return translation_table
 
     def create_refseq_header(self, input_bam: str, output_sam: str):

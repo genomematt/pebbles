@@ -272,3 +272,25 @@ def test_identification_works_offline(tmp_path, mock_bam_factory, monkeypatch):
     with pytest.raises(ValueError, match="No match"):
         gi.identify_assembly(mock_bam_factory("amplicon.bam", [("AY286018", 1433)]))
     assert list((tmp_path / "empty_cache").iterdir()) == []
+
+
+@pytest.mark.parametrize("sequences, expected", [
+    # GRCh38 Ensembl/NCBI style names, with an unlocalized scaffold by GenBank accession
+    ([("1", 248956422), ("X", 156040895), ("MT", 16569), ("KI270706.1", 175055)],
+     ["NC_000001.11", "NC_000023.11", "NC_012920.1", "NT_187361.1"]),
+    # GRCh37 b37 style names (eg GATK b37 / hs37d5)
+    ([("1", 249250621), ("X", 155270560), ("MT", 16569), ("GL000192.1", 547496)],
+     ["NC_000001.10", "NC_000023.10", "NC_012920.1", "NT_167207.1"]),
+    # GRCm39 Ensembl names, including chromosomes that have unlocalized scaffolds
+    ([("1", 195154279), ("4", 156860686), ("X", 169476592)],
+     ["NC_000067.7", "NC_000070.7", "NC_000086.8"]),
+    # GRCh38 UCSC names, including an unlocalized scaffold
+    ([("chr1", 248956422), ("chrX", 156040895), ("chrM", 16569), ("chr1_KI270706v1_random", 175055)],
+     ["NC_000001.11", "NC_000023.11", "NC_012920.1", "NT_187361.1"]),
+])
+def test_refseq_header_translates_name_styles(gi_tool, mock_bam_factory, tmp_path, sequences, expected):
+    bam = mock_bam_factory("names.bam", sequences)
+    out_sam = str(tmp_path / "reheaded.sam")
+    gi_tool.create_refseq_header(bam, out_sam)
+    with pysam.AlignmentFile(out_sam, "r") as sam:
+        assert [sq['SN'] for sq in sam.header['SQ']] == expected

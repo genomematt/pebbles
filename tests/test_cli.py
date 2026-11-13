@@ -84,3 +84,10 @@ def test_unreadable_input_is_a_clean_error(tmp_path, make_path):
     with pytest.raises(SystemExit) as exit_info:
         main(['count', path])
     assert f'cannot read alignments from {path}' in str(exit_info.value.code)
+
+
+def test_no_index_message_for_unindexed_bam(capfd):
+    main(['count', TEST_BAM])
+    captured = capfd.readouterr()
+    assert captured.out == EXPECTED_COUNT
+    assert captured.err == ''

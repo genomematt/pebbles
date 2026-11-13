@@ -400,11 +400,16 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
 
 def main(arguments: Optional[Union[str, Sequence[str]]] = None):
     args = cli(arguments)
+    # htslib logs an error when a BAM has no index, which pebbles never needs,
+    # and duplicates the open failures reported below, so silence it while opening
+    htslib_verbosity = pysam.set_verbosity(0)
     try:
         # htslib detects SAM or BAM from the content, so this also works for stdin ('-')
         infile = pysam.AlignmentFile(args.infile, "r")
     except (OSError, ValueError) as error:
         sys.exit(f"pebbles: error: cannot read alignments from {args.infile}: {error}")
+    finally:
+        pysam.set_verbosity(htslib_verbosity)
 
     if args.command == 'call':
         print('readname\tvariants')

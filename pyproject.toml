@@ -45,9 +45,19 @@ dependencies = [
 countess = [
     "countess >= 0.0.24, < 0.1"
 ]
+
+[dependency-groups]
+# development-only dependencies (PEP 735), eg: pip install --group test
 test = [
     "pytest",
     "pytest-cov",
+]
+lint = [
+    "flake8",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
 ]
 
 [project.scripts]

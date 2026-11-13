@@ -163,3 +163,17 @@ def _call(cigar: str, mdtag: str, seq: str, pos: int = 0, refname: str = 'R') ->
 ])
 def test_call_mutations_adjacent_events(cigar, mdtag, seq, expected):
     assert _call(cigar, mdtag, seq) == expected
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # mismatch downstream of an insertion
+    ('5M2I5M', '8A1', 'ACGTAGGCGTTC', ['R:g.5_6insGG', 'R:g.9A>T']),
+    # deletion downstream of an insertion
+    ('5M2I1M2D2M', '6^GT2', 'ACGTAGGCAC', ['R:g.5_6insGG', 'R:g.7_8delGT']),
+    # insertion immediately followed by a deletion
+    ('5M2I2D3M', '5^CG3', 'ACGTAGGTAC', ['R:g.5_6insGG', 'R:g.6_7delCG']),
+    # two insertions in one read
+    ('2M1I3M1I5M', '10', 'ACTGTATCGTAC', ['R:g.2_3insT', 'R:g.5_6insT']),
+])
+def test_call_mutations_after_insertion(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected

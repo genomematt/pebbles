@@ -139,7 +139,7 @@ def call_mutations(refname: str,
     """
     mutations = []
     i = 0
-    nonref_bases = 0
+    nonref_bases = 0  # inserted read bases so far; these columns do not consume reference
     softmasked = 0
     while i < len(gapped_read):
         if expanded_cigar[i] == 'S':
@@ -154,16 +154,16 @@ def call_mutations(refname: str,
             continue
         if expanded_cigar[i] == 'D':
             deleted = ''
-            delstart = i + pos + 1 + nonref_bases - softmasked
+            delstart = i + pos + 1 - nonref_bases - softmasked
             while expanded_cigar[i] == 'D':
                 deleted += expanded_engapped_md[i]
                 i += 1
-            mutations.append(f'{refname}:g.{delstart}_{i + pos + nonref_bases - softmasked}del{deleted}')
+            mutations.append(f'{refname}:g.{delstart}_{i + pos - nonref_bases - softmasked}del{deleted}')
             # re-evaluate the state at i, which may be an adjacent event
             continue
         if expanded_cigar[i] == 'I':
             inserted = ''
-            insstart = i + pos + nonref_bases - softmasked  # base before first event base
+            insstart = i + pos - nonref_bases - softmasked  # base before first event base
             while expanded_cigar[i] == 'I':
                 inserted += gapped_read[i]
                 i += 1
@@ -174,7 +174,7 @@ def call_mutations(refname: str,
                 expanded_cigar[i] == 'X':
             mutant = ''
             reference = ''
-            substart = i + pos + 1 + nonref_bases - softmasked
+            substart = i + pos + 1 - nonref_bases - softmasked
             while len(expanded_cigar) > i and expanded_cigar[i] in 'MX' and len(expanded_engapped_md) > i and expanded_engapped_md[i] != '.':
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
@@ -186,7 +186,7 @@ def call_mutations(refname: str,
             if len(mutant) == 1:
                 mutations.append(f'{refname}:g.{substart}{reference}>{mutant}')
             else:
-                mutations.append(f'{refname}:g.{substart}_{i + pos + nonref_bases - softmasked}delins{mutant}')
+                mutations.append(f'{refname}:g.{substart}_{i + pos - nonref_bases - softmasked}delins{mutant}')
             continue
         # any other operator (eg N, P) does not produce a call
         i += 1

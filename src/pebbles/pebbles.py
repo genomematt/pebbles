@@ -3,12 +3,13 @@
 import argparse
 import collections
 import re
+import shlex
 import sys
 import traceback
 from collections import defaultdict
 from itertools import islice
-from collections.abc import Iterable, Mapping
-from typing import Tuple, Optional
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Tuple, Optional, Union
 from pebbles import VERSION
 
 import pysam
@@ -321,8 +322,13 @@ def count(pysamfile: Iterable,
     return ''.join([f'{key}\t{counts[key]}\n' for key in counts])
 
 
-def cli(arguments: Optional[str] = None) -> argparse.Namespace:
-    """command line interface. Use pebbles -h to see help"""
+def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Namespace:
+    """command line interface. Use pebbles -h to see help
+
+    Arguments:
+        arguments: a command line string (eg 'count --max 2 in.bam') or a list
+                   of arguments. Default None uses sys.argv
+    """
     parser = argparse.ArgumentParser(description=f"pebbles v{VERSION}" + """
                   (                                                                
              /((/ ###((%*                                                       
@@ -386,19 +392,18 @@ def cli(arguments: Optional[str] = None) -> argparse.Namespace:
     parser.add_argument('--version',
                         action='store_true',
                         help='print version information and exit')
-    if arguments:
-        args = parser.parse_args(arguments.split(' '))
-    else:
-        args = parser.parse_args()
+    if isinstance(arguments, str):
+        arguments = shlex.split(arguments)
+    args = parser.parse_args(arguments)
     if args.version:
         print(f"pebbles v{VERSION}")
         sys.exit()
 
-    return parser.parse_args()
+    return args
 
 
-def main():
-    args = cli()
+def main(arguments: Optional[Union[str, Sequence[str]]] = None):
+    args = cli(arguments)
     if args.infile.split('.')[-1].lower() == 'sam':
         infile = pysam.AlignmentFile(args.infile, "r")
     else:

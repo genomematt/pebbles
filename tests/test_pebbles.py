@@ -119,6 +119,7 @@ def test_count_and_dicts():
     ("chr1", 248956422, "GCF_000001405.40"),  # Human p14
     ("1", 249250621, "GCF_000001405.25"),  # Human p13/hg19
     ("chr1", 195154279, "GCF_000001635.27"),  # Mouse mm39
+    ("chr1", 248387328, "GCF_009914755.1"),  # Human T2T-CHM13v2.0
 ])
 def test_assembly_identification(gi_tool, mock_bam_factory, name, length, expected_acc):
     """Verifies that the Jaccard-style length matching identifies the correct assembly."""
@@ -242,3 +243,8 @@ def test_skip_warnings_use_logger(sam_factory):
     sam = sam_factory([['noMD', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*']])
     list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"), logger=logger))
     assert logger.warnings == ['skipping noMD as it has no MD tag']
+
+
+def test_unknown_accession_download_is_a_clear_error(gi_tool):
+    with pytest.raises(ValueError, match="No NCBI download location"):
+        gi_tool.refresh_cache("GCF_999999999.1", "NotAnAssembly")

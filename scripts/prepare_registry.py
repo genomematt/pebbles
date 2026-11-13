@@ -22,6 +22,10 @@ def generate_registry():
         registry.append(
             {"cat": "vertebrate_mammalian", "species": "Homo_sapiens", "id": aid, "acc": f"GCF_000001405.{v}"})
 
+    # Human T2T-CHM13 (a separate RefSeq assembly series from GRCh)
+    registry.append(
+        {"cat": "vertebrate_mammalian", "species": "Homo_sapiens", "id": "T2T-CHM13v2.0", "acc": "GCF_009914755.1"})
+
     # --- Mouse (Mus_musculus) ---
     registry.append(
         {"cat": "vertebrate_mammalian", "species": "Mus_musculus", "id": "GRCm39", "acc": "GCF_000001635.27"})

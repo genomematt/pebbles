@@ -35,6 +35,9 @@ class GenomeIdentifier:
         ]
         manifest.extend([(f"GCF_000001405.{v}", aid) for v, aid in grch37_versions])
 
+        # Human T2T-CHM13 (a separate RefSeq assembly series from GRCh)
+        manifest.append(("GCF_009914755.1", "T2T-CHM13v2.0"))
+
         # Mouse
         manifest.append(("GCF_000001635.27", "GRCm39"))
         manifest.extend([(f"GCF_000001635.{20 + i}", f"GRCm38" if i == 0 else f"GRCm38.p{i}") for i in range(7)])
@@ -70,15 +73,14 @@ class GenomeIdentifier:
         """Downloads the report using robust species paths and updates the local cache."""
         # 1. Determine the category and species based on the accession/aid
         # This logic matches the hierarchy used in your build script
-        if "000001405" in acc:
+        if "000001405" in acc or "009914755" in acc:
             cat, species = "vertebrate_mammalian", "Homo_sapiens"
         elif "000001635" in acc:
             cat, species = "vertebrate_mammalian", "Mus_musculus"
         elif "000146045" in acc:
             cat, species = "fungi", "Saccharomyces_cerevisiae"
         else:
-            # Default fallback to generic path if species is unknown
-            return self._refresh_cache_legacy(acc, aid)
+            raise ValueError(f"No NCBI download location is known for {aid} ({acc})")
 
         base_ftp = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq"
         folder_name = f"{acc}_{aid}"

@@ -1,0 +1,2 @@
+# NCBI assembly reports are bundled byte-for-byte as published (CRLF line endings)
+src/pebbles/data/assemblies/*.report.txt -text

@@ -1,27 +1,63 @@
+[build-system]
+requires = ["hatchling >= 1.27"]
+build-backend = "hatchling.build"
+
 [project]
 name = "pebbles"
-version = "0.3.0"
+dynamic = ["version"]
 authors = [
   { name="Matthew Wakefield", email="matthew.wakefield@unimelb.edu.au" },
 ]
 description = "A package for calling HGVS variants in single SAM/BAM alignments"
 readme = "README.md"
-requires-python = ">=3.9"
+license = "BSD-3-Clause"
+requires-python = ">=3.10"
+keywords = [
+    "HGVS",
+    "variant calling",
+    "SAM",
+    "BAM",
+    "saturation genome editing",
+    "multiplex assays of variant effect",
+    "deep mutational scanning",
+]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: BSD License",
-    "Operating System :: OS Independent",
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 dependencies = [
   "pysam >= 0.20.0",
+  "pandas",
+  "requests",
 ]
 
 [project.optional-dependencies]
 countess = [
     "countess >= 0.0.24, < 0.1"
+]
+
+[dependency-groups]
+# development-only dependencies (PEP 735), eg: pip install --group test
+test = [
+    "pytest",
+    "pytest-cov",
+]
+lint = [
+    "flake8",
+]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
 ]
 
 [project.scripts]
@@ -31,15 +67,29 @@ pebbles = "pebbles.pebbles:main"
 count_SAM = "pebbles.countess:CountSAMPlugin"
 count_BAM = "pebbles.countess:CountBAMPlugin"
 
-
 [project.urls]
-"Homepage" = "https://github.com/genomematt/pebbles"
-"Bug Tracker" = "https://github.com/genomematt/pebbles"
+Homepage = "https://github.com/genomematt/pebbles"
+Repository = "https://github.com/genomematt/pebbles"
+Issues = "https://github.com/genomematt/pebbles/issues"
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.hatch.version]
+# single source of truth for the version is pebbles.VERSION
+path = "src/pebbles/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+# IDE and CI configuration are not needed to build or test from the sdist
+exclude = [
+    "/.idea",
+    "/.github",
+]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pebbles", "tests"]
+# tests are kept in the sdist (for downstream packagers) but not installed by the wheel
+packages = ["src/pebbles"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -v --showlocals"
+python_files = "test_*.py"
+python_functions = "test_*"
+python_classes = "Test*"

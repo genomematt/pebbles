@@ -1,0 +1,22 @@
+# build outputs
+dist/
+build/
+*.egg-info/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# test and coverage outputs
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# virtual environments
+.venv/
+venv/
+
+# macOS
+.DS_Store

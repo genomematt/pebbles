@@ -155,7 +155,7 @@ def call_mutations(refname: str,
         if expanded_cigar[i] == 'D':
             deleted = ''
             delstart = i + pos + 1 - nonref_bases - softmasked
-            while expanded_cigar[i] == 'D':
+            while i < len(expanded_cigar) and expanded_cigar[i] == 'D':
                 deleted += expanded_engapped_md[i]
                 i += 1
             mutations.append(f'{refname}:g.{delstart}_{i + pos - nonref_bases - softmasked}del{deleted}')
@@ -164,7 +164,7 @@ def call_mutations(refname: str,
         if expanded_cigar[i] == 'I':
             inserted = ''
             insstart = i + pos - nonref_bases - softmasked  # base before first event base
-            while expanded_cigar[i] == 'I':
+            while i < len(expanded_cigar) and expanded_cigar[i] == 'I':
                 inserted += gapped_read[i]
                 i += 1
                 nonref_bases += 1

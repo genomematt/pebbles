@@ -177,3 +177,15 @@ def test_call_mutations_adjacent_events(cigar, mdtag, seq, expected):
 ])
 def test_call_mutations_after_insertion(cigar, mdtag, seq, expected):
     assert _call(cigar, mdtag, seq) == expected
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # insertion as the final alignment operator
+    ('10M2I', '10', 'ACGTACGTACGG', ['R:g.10_11insGG']),
+    # deletion as the final alignment operator
+    ('8M2D', '8^AC', 'ACGTACGT', ['R:g.9_10delAC']),
+    # insertion before a trailing soft clip
+    ('10M2I2S', '10', 'ACGTACGTACGGTT', ['R:g.10_11insGG']),
+])
+def test_call_mutations_trailing_events(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected

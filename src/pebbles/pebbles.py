@@ -370,16 +370,16 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
     count = subparsers.add_parser('count',
                                   help='count occurrences of a variant')
     call = subparsers.add_parser('call',
-                                 help='count occurrences of a variant')
+                                 help='list the variants called in each read')
     count.add_argument('--max',
                        type=int,
                        default=1,
-                       help='Maximum number of variants in a read to include in count table'
+                       help='Maximum number of variants in a read to include in count table. Default 1'
                        )
     count.add_argument('--min_quality',
                        type=int,
                        default=0,
-                       help='Minimum quality score required to count a variant'
+                       help='Minimum mapping quality (MAPQ) of a read for its variants to be counted. Default 0'
                        )
     count.add_argument('infile',
                        type=str,
@@ -388,7 +388,7 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
     call.add_argument('--min_quality',
                       type=int,
                       default=0,
-                      help='Minimum quality score required to call a variant'
+                      help='Minimum mapping quality (MAPQ) of a read for its variants to be called. Default 0'
                       )
     call.add_argument('infile',
                       type=str,

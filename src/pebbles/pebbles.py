@@ -75,24 +75,27 @@ def engap(seq: str,
           cigar: str,
           is_reference: bool = False) -> str:
     """Convert a match/delete/insert string and sequence into gapped sequence
-    To convert the target sequence swap delete and insert symbols.
+    with one character per expanded cigar operator.
+    For a read sequence, bases are consumed by M I S = X operators.
+    For the reference (an expanded MD tag, is_reference=True), states are
+    consumed by M D = X operators, as these are the only ones the MD tag
+    describes. All other operators (eg D, N, H, P for reads) are gaps.
         Arguments:
             o   seq : a sequence string
             o   cigar : a cigar string eg 80M5D10M10I
+            o   is_reference : seq is an expanded MD tag rather than a read
         Returns:
             o   string : gapped seqeunce
     """
-    deletion_symbol = 'I' if is_reference else 'D'
+    consuming = 'MD=X' if is_reference else 'MIS=X'
     gapped = []
     xcigar = expand_cigar(cigar)
     seq_list = list(seq)
     for symbol in xcigar:
-        if symbol == deletion_symbol:
-            gapped.append('-')
-        elif is_reference and symbol == 'S':
-            gapped.append('-')
-        else:
+        if symbol in consuming:
             gapped.append(seq_list.pop(0))
+        else:
+            gapped.append('-')
     return "".join(gapped)
 
 
@@ -142,8 +145,8 @@ def call_mutations(refname: str,
     nonref_bases = 0  # inserted read bases so far; these columns do not consume reference
     softmasked = 0
     while i < len(gapped_read):
-        if expanded_cigar[i] == 'S':
-            # softmasked state
+        if expanded_cigar[i] in 'SHP':
+            # soft clipped, hard clipped or padding state: no reference consumed
             softmasked += 1
             i += 1
             continue

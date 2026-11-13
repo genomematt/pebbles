@@ -222,3 +222,22 @@ def test_primary_without_sequence_skipped(sam_factory):
         ['r2', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
     ])
     assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == [('r2', ['R:g.5A>T'])]
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # leading hard clip: clipped bases are absent from SEQ and do not consume reference
+    ('2H10M', '4A5', 'ACGTTCGTAC', ['R:g.5A>T']),
+    # trailing hard clip
+    ('10M2H', '4A5', 'ACGTTCGTAC', ['R:g.5A>T']),
+    # hard and soft clips together
+    ('3H2S10M', '4A5', 'GGACGTTCGTAC', ['R:g.5A>T']),
+    # reference skip: skipped bases are absent from both SEQ and the MD tag
+    ('4M3N3M', '5A1', 'ACGTTGC', ['R:g.9A>G']),
+])
+def test_call_mutations_clip_and_skip_operators(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected
+
+
+def test_engap_non_consuming_operators():
+    assert engap(seq='ACGTTGC', cigar='2H4M3N3M') == '--ACGT---TGC'
+    assert engap(seq='....T.G', cigar='2H4M3N3M', is_reference=True) == '--....---T.G'

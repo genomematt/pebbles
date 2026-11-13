@@ -196,6 +196,15 @@ def call_mutations(refname: str,
     return mutations
 
 
+def _warn(message: str, logger: Optional[Logger] = None) -> None:
+    """Report a warning via logger if given, otherwise on stderr so that
+    it does not corrupt tabular output written to stdout"""
+    if logger:
+        logger.warning(message)
+    else:
+        print(message, file=sys.stderr)
+
+
 def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
                               min_quality: int =0,
                               logger: Optional[Logger] = None,
@@ -225,18 +234,12 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
         if segment.mapping_quality < min_quality:
             continue
         if segment.query_sequence is None:
-            if logger:
-                logger.warning(f'skipping {segment.qname} as it has no sequence')
-            else:
-                print(f'skipping {segment.qname} as it has no sequence')
+            _warn(f'skipping {segment.qname} as it has no sequence', logger)
             continue
         try:
             mdtag = segment.get_tag('MD')
         except KeyError:
-            if logger:
-                logger.warning(f'skipping {segment.qname} as it has no MD tag')
-            else:
-                print(f'skipping {segment.qname} as it has no MD tag')
+            _warn(f'skipping {segment.qname} as it has no MD tag', logger)
             # skip reads with no MD tag
             continue
 

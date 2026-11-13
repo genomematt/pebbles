@@ -241,3 +241,28 @@ def test_call_mutations_clip_and_skip_operators(cigar, mdtag, seq, expected):
 def test_engap_non_consuming_operators():
     assert engap(seq='ACGTTGC', cigar='2H4M3N3M') == '--ACGT---TGC'
     assert engap(seq='....T.G', cigar='2H4M3N3M', is_reference=True) == '--....---T.G'
+
+
+def test_skip_warnings_go_to_stderr(sam_factory, capsys):
+    sam = sam_factory([
+        ['noMD', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*'],
+        ['noSEQ', '0', 'R', '1', '60', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+    ])
+    assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == []
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert 'noMD' in captured.err and 'noSEQ' in captured.err
+
+
+def test_skip_warnings_use_logger(sam_factory):
+    class RecordingLogger:
+        def __init__(self):
+            self.warnings = []
+
+        def warning(self, message, detail=None):
+            self.warnings.append(message)
+
+    logger = RecordingLogger()
+    sam = sam_factory([['noMD', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*']])
+    list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"), logger=logger))
+    assert logger.warnings == ['skipping noMD as it has no MD tag']

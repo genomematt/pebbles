@@ -76,6 +76,13 @@ Issues = "https://github.com/genomematt/pebbles/issues"
 # single source of truth for the version is pebbles.VERSION
 path = "src/pebbles/__init__.py"
 
+[tool.hatch.build.targets.sdist]
+# IDE and CI configuration are not needed to build or test from the sdist
+exclude = [
+    "/.idea",
+    "/.github",
+]
+
 [tool.hatch.build.targets.wheel]
 # tests are kept in the sdist (for downstream packagers) but not installed by the wheel
 packages = ["src/pebbles"]

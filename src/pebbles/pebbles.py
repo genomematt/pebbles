@@ -159,6 +159,8 @@ def call_mutations(refname: str,
                 deleted += expanded_engapped_md[i]
                 i += 1
             mutations.append(f'{refname}:g.{delstart}_{i + pos + nonref_bases - softmasked}del{deleted}')
+            # re-evaluate the state at i, which may be an adjacent event
+            continue
         if expanded_cigar[i] == 'I':
             inserted = ''
             insstart = i + pos + nonref_bases - softmasked  # base before first event base
@@ -167,6 +169,7 @@ def call_mutations(refname: str,
                 i += 1
                 nonref_bases += 1
             mutations.append(f'{refname}:g.{insstart}_{insstart + 1}ins{inserted}')
+            continue
         if (expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.') or \
                 expanded_cigar[i] == 'X':
             mutant = ''
@@ -176,10 +179,16 @@ def call_mutations(refname: str,
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
                 i += 1
+            if not mutant:
+                # X operator without a matching MD mismatch: nothing to call
+                i += 1
+                continue
             if len(mutant) == 1:
                 mutations.append(f'{refname}:g.{substart}{reference}>{mutant}')
             else:
                 mutations.append(f'{refname}:g.{substart}_{i + pos + nonref_bases - softmasked}delins{mutant}')
+            continue
+        # any other operator (eg N, P) does not produce a call
         i += 1
     return mutations
 

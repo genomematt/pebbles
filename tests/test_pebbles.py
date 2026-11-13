@@ -142,3 +142,24 @@ def test_contaminant_handling(gi_tool, mock_bam_factory, tmp_path):
         names = [sq['SN'] for sq in sam.header['SQ']]
         assert "NC_000001.11" in names  # hg38 RefSeq ID
         assert "EBV" in names  # Unchanged
+
+# --- REGRESSION TESTS: ADJACENT AND BOUNDARY EVENTS ---
+# Reference used below: ACGTACGTAC (positions 1-10), alignments start at pos 0
+
+def _call(cigar: str, mdtag: str, seq: str, pos: int = 0, refname: str = 'R') -> list:
+    return call_mutations(refname, pos,
+                          engap(expand_mdtag(mdtag), cigar, is_reference=True),
+                          expand_cigar(cigar),
+                          engap(seq, cigar))
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # mismatch immediately followed by a deletion
+    ('5M2D3M', '4A0^CG3', 'ACGTTTAC', ['R:g.5A>T', 'R:g.6_7delCG']),
+    # deletion immediately followed by a mismatch
+    ('4M2D4M', '4^AC0G3', 'ACGTCTAC', ['R:g.5_6delAC', 'R:g.7G>C']),
+    # mismatch immediately followed by an insertion
+    ('5M2I5M', '4A5', 'ACGTTGGCGTAC', ['R:g.5A>T', 'R:g.5_6insGG']),
+])
+def test_call_mutations_adjacent_events(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected

@@ -382,7 +382,7 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
                        )
     count.add_argument('infile',
                        type=str,
-                       help='a SAM or BAM format file of mapped single end reads',
+                       help='a SAM or BAM format file of mapped single end reads (- for stdin)',
                        )
     call.add_argument('--min_quality',
                       type=int,
@@ -391,7 +391,7 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
                       )
     call.add_argument('infile',
                       type=str,
-                      help='a SAM or BAM format file of mapped single end reads',
+                      help='a SAM or BAM format file of mapped single end reads (- for stdin)',
                       )
     if isinstance(arguments, str):
         arguments = shlex.split(arguments)
@@ -400,10 +400,11 @@ def cli(arguments: Optional[Union[str, Sequence[str]]] = None) -> argparse.Names
 
 def main(arguments: Optional[Union[str, Sequence[str]]] = None):
     args = cli(arguments)
-    if args.infile.split('.')[-1].lower() == 'sam':
+    try:
+        # htslib detects SAM or BAM from the content, so this also works for stdin ('-')
         infile = pysam.AlignmentFile(args.infile, "r")
-    else:
-        infile = pysam.AlignmentFile(args.infile, "rb")
+    except (OSError, ValueError) as error:
+        sys.exit(f"pebbles: error: cannot read alignments from {args.infile}: {error}")
 
     if args.command == 'call':
         print('readname\tvariants')

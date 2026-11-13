@@ -2,6 +2,7 @@
 # A per read bam mutation caller
 import argparse
 import collections
+import os
 import re
 import shlex
 import sys
@@ -411,13 +412,21 @@ def main(arguments: Optional[Union[str, Sequence[str]]] = None):
     finally:
         pysam.set_verbosity(htslib_verbosity)
 
-    if args.command == 'call':
-        print('readname\tvariants')
-        for x in call_mutations_from_pysam(infile, min_quality=args.min_quality):
-            print("\t".join([str(_) for _ in x]))
-    elif args.command == 'count':
-        print('variant\tcount')
-        print(count(infile, max_variants=args.max, min_quality=args.min_quality), end='')
+    try:
+        if args.command == 'call':
+            print('readname\tvariants')
+            for x in call_mutations_from_pysam(infile, min_quality=args.min_quality):
+                print("\t".join([str(_) for _ in x]))
+        elif args.command == 'count':
+            print('variant\tcount')
+            print(count(infile, max_variants=args.max, min_quality=args.min_quality), end='')
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # the reader closed the pipe early (eg pebbles call in.bam | head).
+        # Redirect stdout to devnull so the interpreter's final flush does not fail again
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        sys.exit(1)
 
 
 if __name__ == '__main__':

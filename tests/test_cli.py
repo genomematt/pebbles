@@ -91,3 +91,24 @@ def test_no_index_message_for_unindexed_bam(capfd):
     captured = capfd.readouterr()
     assert captured.out == EXPECTED_COUNT
     assert captured.err == ''
+
+
+def test_closed_output_pipe_exits_quietly(tmp_path):
+    import subprocess
+    import sys
+    import pebbles
+    # enough reads that output exceeds the pipe buffer after the reader has gone
+    header = [line for line in open(TEST_SAM) if line.startswith('@')]
+    records = [line for line in open(TEST_SAM) if not line.startswith('@')]
+    big_sam = tmp_path / "big.sam"
+    big_sam.write_text(''.join(header + records * 5000))
+
+    env = dict(os.environ, PYTHONPATH=str(pathlib.Path(pebbles.__file__).parent.parent))
+    process = subprocess.Popen([sys.executable, '-m', 'pebbles.pebbles', 'call', str(big_sam)],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    assert process.stdout.readline() == b'readname\tvariants\n'
+    process.stdout.close()
+    stderr = process.stderr.read()
+    process.wait(timeout=60)
+    assert b'Traceback' not in stderr
+    assert b'BrokenPipeError' not in stderr

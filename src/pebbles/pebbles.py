@@ -75,24 +75,27 @@ def engap(seq: str,
           cigar: str,
           is_reference: bool = False) -> str:
     """Convert a match/delete/insert string and sequence into gapped sequence
-    To convert the target sequence swap delete and insert symbols.
+    with one character per expanded cigar operator.
+    For a read sequence, bases are consumed by M I S = X operators.
+    For the reference (an expanded MD tag, is_reference=True), states are
+    consumed by M D = X operators, as these are the only ones the MD tag
+    describes. All other operators (eg D, N, H, P for reads) are gaps.
         Arguments:
             o   seq : a sequence string
             o   cigar : a cigar string eg 80M5D10M10I
+            o   is_reference : seq is an expanded MD tag rather than a read
         Returns:
             o   string : gapped seqeunce
     """
-    deletion_symbol = 'I' if is_reference else 'D'
+    consuming = 'MD=X' if is_reference else 'MIS=X'
     gapped = []
     xcigar = expand_cigar(cigar)
     seq_list = list(seq)
     for symbol in xcigar:
-        if symbol == deletion_symbol:
-            gapped.append('-')
-        elif is_reference and symbol == 'S':
-            gapped.append('-')
-        else:
+        if symbol in consuming:
             gapped.append(seq_list.pop(0))
+        else:
+            gapped.append('-')
     return "".join(gapped)
 
 
@@ -139,11 +142,11 @@ def call_mutations(refname: str,
     """
     mutations = []
     i = 0
-    nonref_bases = 0
+    nonref_bases = 0  # inserted read bases so far; these columns do not consume reference
     softmasked = 0
     while i < len(gapped_read):
-        if expanded_cigar[i] == 'S':
-            # softmasked state
+        if expanded_cigar[i] in 'SHP':
+            # soft clipped, hard clipped or padding state: no reference consumed
             softmasked += 1
             i += 1
             continue
@@ -154,34 +157,52 @@ def call_mutations(refname: str,
             continue
         if expanded_cigar[i] == 'D':
             deleted = ''
-            delstart = i + pos + 1 + nonref_bases - softmasked
-            while expanded_cigar[i] == 'D':
+            delstart = i + pos + 1 - nonref_bases - softmasked
+            while i < len(expanded_cigar) and expanded_cigar[i] == 'D':
                 deleted += expanded_engapped_md[i]
                 i += 1
-            mutations.append(f'{refname}:g.{delstart}_{i + pos + nonref_bases - softmasked}del{deleted}')
+            mutations.append(f'{refname}:g.{delstart}_{i + pos - nonref_bases - softmasked}del{deleted}')
+            # re-evaluate the state at i, which may be an adjacent event
+            continue
         if expanded_cigar[i] == 'I':
             inserted = ''
-            insstart = i + pos + nonref_bases - softmasked  # base before first event base
-            while expanded_cigar[i] == 'I':
+            insstart = i + pos - nonref_bases - softmasked  # base before first event base
+            while i < len(expanded_cigar) and expanded_cigar[i] == 'I':
                 inserted += gapped_read[i]
                 i += 1
                 nonref_bases += 1
             mutations.append(f'{refname}:g.{insstart}_{insstart + 1}ins{inserted}')
+            continue
         if (expanded_cigar[i] == 'M' and expanded_engapped_md[i] != '.') or \
                 expanded_cigar[i] == 'X':
             mutant = ''
             reference = ''
-            substart = i + pos + 1 + nonref_bases - softmasked
+            substart = i + pos + 1 - nonref_bases - softmasked
             while len(expanded_cigar) > i and expanded_cigar[i] in 'MX' and len(expanded_engapped_md) > i and expanded_engapped_md[i] != '.':
                 mutant += gapped_read[i]
                 reference += expanded_engapped_md[i]
                 i += 1
+            if not mutant:
+                # X operator without a matching MD mismatch: nothing to call
+                i += 1
+                continue
             if len(mutant) == 1:
                 mutations.append(f'{refname}:g.{substart}{reference}>{mutant}')
             else:
-                mutations.append(f'{refname}:g.{substart}_{i + pos + nonref_bases - softmasked}delins{mutant}')
+                mutations.append(f'{refname}:g.{substart}_{i + pos - nonref_bases - softmasked}delins{mutant}')
+            continue
+        # any other operator (eg N, P) does not produce a call
         i += 1
     return mutations
+
+
+def _warn(message: str, logger: Optional[Logger] = None) -> None:
+    """Report a warning via logger if given, otherwise on stderr so that
+    it does not corrupt tabular output written to stdout"""
+    if logger:
+        logger.warning(message)
+    else:
+        print(message, file=sys.stderr)
 
 
 def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
@@ -191,7 +212,8 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
     """A generator function to call variants in all reads in a SAM/BAM
     file to HGVS format, on a per read basis.
     Assumes single end sequencing or merged paired end sequencing
-    qcfail, supplementary and unmapped segments are ignored
+    qcfail, secondary, supplementary and unmapped segments are ignored,
+    as are segments with no stored sequence (SEQ of *)
 
     Arguments:
         pysamfile: a pysam.AlignmentFile object
@@ -207,17 +229,17 @@ def call_mutations_from_pysam(pysamfile: collections.abc.Iterable,
     """
 
     for segment in pysamfile:
-        if segment.is_qcfail or segment.is_supplementary or segment.is_unmapped:
+        if segment.is_qcfail or segment.is_secondary or segment.is_supplementary or segment.is_unmapped:
             continue
         if segment.mapping_quality < min_quality:
+            continue
+        if segment.query_sequence is None:
+            _warn(f'skipping {segment.qname} as it has no sequence', logger)
             continue
         try:
             mdtag = segment.get_tag('MD')
         except KeyError:
-            if logger:
-                logger.warning(f'skipping {segment.qname} as it has no MD tag')
-            else:
-                print(f'skipping {segment.qname} as it has no MD tag')
+            _warn(f'skipping {segment.qname} as it has no MD tag', logger)
             # skip reads with no MD tag
             continue
 

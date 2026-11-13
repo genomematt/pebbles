@@ -35,6 +35,19 @@ def mock_bam_factory(tmp_path):
     return _create_bam
 
 
+@pytest.fixture
+def sam_factory(tmp_path):
+    """Writes SAM records against a 10bp reference R (ACGTACGTAC) to a file and returns its path."""
+
+    def _create_sam(records: list, filename: str = "records.sam"):
+        path = tmp_path / filename
+        lines = ["@SQ\tSN:R\tLN:10"] + ["\t".join(fields) for fields in records]
+        path.write_text("\n".join(lines) + "\n")
+        return str(path)
+
+    return _create_sam
+
+
 # --- CORE PEBBLES TESTS ---
 
 @pytest.mark.parametrize("cigar, expected", [
@@ -142,3 +155,114 @@ def test_contaminant_handling(gi_tool, mock_bam_factory, tmp_path):
         names = [sq['SN'] for sq in sam.header['SQ']]
         assert "NC_000001.11" in names  # hg38 RefSeq ID
         assert "EBV" in names  # Unchanged
+
+# --- REGRESSION TESTS: ADJACENT AND BOUNDARY EVENTS ---
+# Reference used below: ACGTACGTAC (positions 1-10), alignments start at pos 0
+
+def _call(cigar: str, mdtag: str, seq: str, pos: int = 0, refname: str = 'R') -> list:
+    return call_mutations(refname, pos,
+                          engap(expand_mdtag(mdtag), cigar, is_reference=True),
+                          expand_cigar(cigar),
+                          engap(seq, cigar))
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # mismatch immediately followed by a deletion
+    ('5M2D3M', '4A0^CG3', 'ACGTTTAC', ['R:g.5A>T', 'R:g.6_7delCG']),
+    # deletion immediately followed by a mismatch
+    ('4M2D4M', '4^AC0G3', 'ACGTCTAC', ['R:g.5_6delAC', 'R:g.7G>C']),
+    # mismatch immediately followed by an insertion
+    ('5M2I5M', '4A5', 'ACGTTGGCGTAC', ['R:g.5A>T', 'R:g.5_6insGG']),
+])
+def test_call_mutations_adjacent_events(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # mismatch downstream of an insertion
+    ('5M2I5M', '8A1', 'ACGTAGGCGTTC', ['R:g.5_6insGG', 'R:g.9A>T']),
+    # deletion downstream of an insertion
+    ('5M2I1M2D2M', '6^GT2', 'ACGTAGGCAC', ['R:g.5_6insGG', 'R:g.7_8delGT']),
+    # insertion immediately followed by a deletion
+    ('5M2I2D3M', '5^CG3', 'ACGTAGGTAC', ['R:g.5_6insGG', 'R:g.6_7delCG']),
+    # two insertions in one read
+    ('2M1I3M1I5M', '10', 'ACTGTATCGTAC', ['R:g.2_3insT', 'R:g.5_6insT']),
+])
+def test_call_mutations_after_insertion(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # insertion as the final alignment operator
+    ('10M2I', '10', 'ACGTACGTACGG', ['R:g.10_11insGG']),
+    # deletion as the final alignment operator
+    ('8M2D', '8^AC', 'ACGTACGT', ['R:g.9_10delAC']),
+    # insertion before a trailing soft clip
+    ('10M2I2S', '10', 'ACGTACGTACGGTT', ['R:g.10_11insGG']),
+])
+def test_call_mutations_trailing_events(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected
+
+
+def test_secondary_alignments_ignored(sam_factory):
+    sam = sam_factory([
+        ['r1', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+        # secondary with a stored sequence must not be counted a second time
+        ['r1', '256', 'R', '1', '0', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+        # secondary with SEQ of * (the usual case) must not crash
+        ['r1', '256', 'R', '1', '0', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+    ])
+    assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == [('r1', ['R:g.5A>T'])]
+    assert count_dict(pysam.AlignmentFile(sam, "r")) == {'R:g.5A>T': 1}
+
+
+def test_primary_without_sequence_skipped(sam_factory):
+    sam = sam_factory([
+        ['r1', '0', 'R', '1', '60', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+        ['r2', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*', 'MD:Z:4A5'],
+    ])
+    assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == [('r2', ['R:g.5A>T'])]
+
+
+@pytest.mark.parametrize("cigar, mdtag, seq, expected", [
+    # leading hard clip: clipped bases are absent from SEQ and do not consume reference
+    ('2H10M', '4A5', 'ACGTTCGTAC', ['R:g.5A>T']),
+    # trailing hard clip
+    ('10M2H', '4A5', 'ACGTTCGTAC', ['R:g.5A>T']),
+    # hard and soft clips together
+    ('3H2S10M', '4A5', 'GGACGTTCGTAC', ['R:g.5A>T']),
+    # reference skip: skipped bases are absent from both SEQ and the MD tag
+    ('4M3N3M', '5A1', 'ACGTTGC', ['R:g.9A>G']),
+])
+def test_call_mutations_clip_and_skip_operators(cigar, mdtag, seq, expected):
+    assert _call(cigar, mdtag, seq) == expected
+
+
+def test_engap_non_consuming_operators():
+    assert engap(seq='ACGTTGC', cigar='2H4M3N3M') == '--ACGT---TGC'
+    assert engap(seq='....T.G', cigar='2H4M3N3M', is_reference=True) == '--....---T.G'
+
+
+def test_skip_warnings_go_to_stderr(sam_factory, capsys):
+    sam = sam_factory([
+        ['noMD', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*'],
+        ['noSEQ', '0', 'R', '1', '60', '10M', '*', '0', '0', '*', '*', 'MD:Z:4A5'],
+    ])
+    assert list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"))) == []
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert 'noMD' in captured.err and 'noSEQ' in captured.err
+
+
+def test_skip_warnings_use_logger(sam_factory):
+    class RecordingLogger:
+        def __init__(self):
+            self.warnings = []
+
+        def warning(self, message, detail=None):
+            self.warnings.append(message)
+
+    logger = RecordingLogger()
+    sam = sam_factory([['noMD', '0', 'R', '1', '60', '10M', '*', '0', '0', 'ACGTTCGTAC', '*']])
+    list(call_mutations_from_pysam(pysam.AlignmentFile(sam, "r"), logger=logger))
+    assert logger.warnings == ['skipping noMD as it has no MD tag']
